@@ -1,36 +1,38 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Zuke
+
+White-label live audio surface for Farcaster communities, powered by Juke.
+
+Graduated from ZAO OS (the lab) to its own repository.
 
 ## Getting Started
 
-First, run the development server:
+See `setup-zuke.md` for provisioning Supabase, configuring environment variables, and deploying.
+
+## Development
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev       # Start dev server
+npm run build     # Production build
+npm run typecheck # Type check
+npm run test      # Run tests
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Key Directories
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- `src/lib/spaces/` - Juke integration (webhooks, space management, partner tokens)
+- `src/components/spaces/` - Audio UI components (embed, listener badge, controls)
+- `src/app/live/` - Public audio rooms and creation interface
+- `src/app/api/juke/` - Juke API routes (create, webhooks, admin)
+- `scripts/` - Database migrations and webhook registration
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Architecture
 
-## Learn More
+- **Rooms**: Created via Juke's API, synced to Supabase `juke_spaces` table
+- **Webhooks**: Juke sends real-time events (participant.joined, space.finished, etc.)
+- **Auth**: Admin password (v0), SIWN in v1
+- **Casting**: Auto-cast stub (no-op in v0, will integrate with ZAO signer later)
 
-To learn more about Next.js, take a look at the following resources:
+## Environment Variables
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+See `.env.example` or `setup-zuke.md` for the full list.

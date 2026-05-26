@@ -1,0 +1,8 @@
+export const ENV = {
+  JUKE_API_KEY: process.env.JUKE_API_KEY ?? '',
+  JUKE_WEBHOOK_SECRET: process.env.JUKE_WEBHOOK_SECRET ?? '',
+  JUKE_CREATE_PASSWORD: process.env.JUKE_CREATE_PASSWORD ?? '',
+  ZUKE_ADMIN_PASSWORD: process.env.ZUKE_ADMIN_PASSWORD ?? '',
+  SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL ?? '',
+  SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ?? '',
+};
