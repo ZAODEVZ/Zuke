@@ -6,7 +6,7 @@ import { zukeConfig } from '@/zuke.config';
 
 export const metadata: Metadata = {
   title: `Juke Recordings - ${zukeConfig.name}`,
-  description: 'Past Juke audio spaces hosted by The ZAO, with recordings.',
+  description: 'Past Juke audio spaces on Zuke, with recordings.',
   robots: { index: false },
 };
 

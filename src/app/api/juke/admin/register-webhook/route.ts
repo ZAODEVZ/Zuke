@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { getSessionData } from '@/lib/auth/session';
 import { ENV } from '@/lib/env';
 import { logger } from '@/lib/logger';
+import { getBaseUrl } from '@/zuke.config';
 
 /**
  * POST /api/juke/admin/register-webhook
@@ -22,7 +23,7 @@ import { logger } from '@/lib/logger';
  * existing subscription rather than duplicating.
  *
  * Body (optional):
- *   { url?: string }   defaults to https://zaoos.com/api/juke/webhooks
+ *   { url?: string }   defaults to `${getBaseUrl()}/api/juke/webhooks`
  *
  * Response:
  *   201 + { ok: true, juke: <Juke response incl. generated secret>, action_required: "..." }
@@ -35,7 +36,9 @@ const BodySchema = z.object({
   url: z.string().url().optional(),
 });
 
-const DEFAULT_URL = 'https://zaoos.com/api/juke/webhooks';
+function defaultWebhookUrl(): string {
+  return `${getBaseUrl()}/api/juke/webhooks`;
+}
 const EVENTS = [
   'room.started',
   'room.finished',
@@ -71,7 +74,7 @@ export async function POST(request: NextRequest) {
       { status: 400 },
     );
   }
-  const url = parsed.data.url ?? DEFAULT_URL;
+  const url = parsed.data.url ?? defaultWebhookUrl();
 
   try {
     // No `secret` in the body - Juke generates and returns it.

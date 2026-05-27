@@ -366,8 +366,8 @@ const CONVENTIONS = [
 
 const CONTACT: IntegrationContact = {
   zao_dev: '@zaal (Farcaster) / zaal@thezao.com',
-  general: 'https://www.thezao.com',
-  partnership: 'See /juke-status on zaoos.com for the live build state.',
+  general: 'https://zuke.thezao.com',
+  partnership: 'See /juke-status on zuke.thezao.com for the live build state.',
 };
 
 /**
@@ -377,9 +377,9 @@ const CONTACT: IntegrationContact = {
 export const INTEGRATION_ARCHITECTURE_ASCII = String.raw`
   USER (web browser)
     |
-    |  (1) loads /live/{spaceId} on zaoos.com - SSR
+    |  (1) loads /live/{spaceId} on zuke.thezao.com - SSR
     v
-  ZAO OS (Next.js, Vercel)
+  Zuke (Next.js, Vercel)
     |
     | reads juke_spaces row              (2) renders <iframe
     | (RLS public-read)                       src="juke.audio/embed/{id}">
@@ -397,7 +397,7 @@ export const INTEGRATION_ARCHITECTURE_ASCII = String.raw`
     |
     | POST /api/juke/webhooks
     v
-  ZAO OS webhook receiver
+  Zuke webhook receiver
     |  HMAC-verify, idempotency on signature_hash
     |  dispatch by event:
     |    room.started      -> juke_spaces.status='active'
@@ -417,8 +417,8 @@ export const INTEGRATION_ARCHITECTURE_ASCII = String.raw`
          -> redirect to /live/{spaceId}
 
   AGENT READ PATH (Nicky's agent):
-    AGENT -> GET zaoos.com/api/juke/status (JSON)
-          OR GET zaoos.com/juke-integration.md (markdown, llms.txt-style)
+    AGENT -> GET zuke.thezao.com/api/juke/status (JSON)
+          OR GET zuke.thezao.com/juke-integration.md (markdown, llms.txt-style)
     same shape as juke.audio/llms.txt, refreshed on every shipped feature
 `;
 
@@ -427,13 +427,14 @@ export function getJukeIntegrationManifest(): IntegrationManifest {
     version: '1.5',
     generated_at: new Date().toISOString(),
     about: {
-      name: 'The ZAO',
-      pitch: 'Decentralized impact network. Music as a wedge, Farcaster-native.',
-      farcaster: 'https://warpcast.com/~/channel/zao',
-      site: 'https://www.thezao.com',
+      name: 'Zuke',
+      pitch:
+        'White-label live audio for Farcaster communities. Built on Juke. Graduated from ZAO OS - The ZAO is the first deployment.',
+      farcaster: 'https://farcaster.xyz/~/channel/zao',
+      site: 'https://zuke.thezao.com',
       juke_path_a_route: '/live/{spaceId}',
       juke_path_b_route: '/api/juke/space (admin or shared password)',
-      public_status_route: 'https://zaoos.com/juke-status',
+      public_status_route: 'https://zuke.thezao.com/juke-status',
     },
     shipped: SHIPPED,
     open_asks: OPEN_ASKS,

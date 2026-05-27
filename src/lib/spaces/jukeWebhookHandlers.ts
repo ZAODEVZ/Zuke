@@ -17,6 +17,7 @@
  */
 import { autoCastToZao } from '@/lib/publish/auto-cast';
 import { logger } from '@/lib/logger';
+import { getBaseUrl } from '@/zuke.config';
 import { isAutoAgentJoinEnabled, joinAgentInJukeRoom } from './jukeAgentJoin';
 import {
   addParticipant,
@@ -224,7 +225,7 @@ export async function applyWebhookEvent(
         try {
           const row = await getJukeSpace(spaceId);
           const title = row?.title ?? 'A ZAO space';
-          const liveUrl = `https://zaoos.com/live/${spaceId}`;
+          const liveUrl = `${getBaseUrl()}/live/${spaceId}`;
           const participants = Array.isArray(row?.participants)
             ? row.participants.length
             : 0;
@@ -263,7 +264,7 @@ export async function applyWebhookEvent(
       try {
         const row = await getJukeSpace(spaceId);
         const title = row?.title ?? 'A ZAO space';
-        const liveUrl = `https://zaoos.com/live/${spaceId}`;
+        const liveUrl = `${getBaseUrl()}/live/${spaceId}`;
         await autoCastToZao(
           `Recording up: ${title}\n\nListen back: ${liveUrl}`,
           liveUrl,

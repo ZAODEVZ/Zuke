@@ -12,7 +12,7 @@ import { JukeLinkOpener } from './JukeLinkOpener';
 
 export const metadata: Metadata = {
   title: `Live on Juke - ${zukeConfig.name}`,
-  description: 'Live, scheduled, and recorded Juke audio spaces hosted by The ZAO. Anyone can listen.',
+  description: 'Live, scheduled, and recorded Juke audio spaces on Zuke. Anyone can listen.',
 };
 
 async function safe<T>(p: Promise<T>, fallback: T): Promise<T> {

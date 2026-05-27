@@ -26,7 +26,7 @@ import { zukeConfig } from '@/zuke.config';
 export const metadata: Metadata = {
   title: `ZAO + Juke - Integration Status`,
   description:
-    'Public dashboard of what The ZAO has built using Juke, live integration stats, recent webhook deliveries, and open asks for the Juke team. Machine-readable mirror at /api/juke/status.',
+    'Public dashboard of what Zuke has built on Juke. Live integration stats, recent webhook deliveries, open asks for the Juke team. Machine-readable mirror at /api/juke/status.',
   openGraph: {
     title: 'ZAO + Juke - Integration Status',
     description: "Live build status of ZAO's Juke integration. Shipped features, recent webhooks, open asks. Refreshes the moment we ship.",
@@ -398,7 +398,7 @@ X-Juke-Api-Key: <JUKE_API_KEY>
 Content-Type: application/json
 
 {
-  "url": "https://zaoos.com/api/juke/webhooks",
+  "url": "https://zuke.thezao.com/api/juke/webhooks",
   "secret": "<JUKE_WEBHOOK_SECRET>",
   "events": [
     "room.started",
