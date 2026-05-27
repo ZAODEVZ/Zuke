@@ -4,9 +4,6 @@ import { ENV } from '@/lib/env';
 import { logger } from '@/lib/logger';
 import { getJukeRoomDetail } from '@/lib/spaces/juke-api-reads';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const sb = supabaseAdmin as any;
-
 /**
  * GET /api/cron/juke-stale-rooms
  *
@@ -52,7 +49,7 @@ export async function GET(request: NextRequest) {
 
   let candidates: Array<{ id: string; title: string | null; started_at: string | null }>;
   try {
-    const { data, error } = await sb
+    const { data, error } = await supabaseAdmin
       .from('juke_spaces')
       .select('id, title, started_at')
       .eq('status', 'active')
@@ -80,13 +77,14 @@ export async function GET(request: NextRequest) {
   const ids = candidates.map((c) => c.id);
   let lastEventByRoom = new Map<string, string>();
   try {
-    const { data, error } = await sb
+    const { data, error } = await supabaseAdmin
       .from('juke_webhook_events')
       .select('space_id, received_at')
       .in('space_id', ids)
       .order('received_at', { ascending: false });
     if (error) throw error;
-    for (const row of (data as Array<{ space_id: string; received_at: string }> | null) ?? []) {
+    const rows = (data ?? []) as Array<{ space_id: string | null; received_at: string }>;
+    for (const row of rows) {
       if (row.space_id && !lastEventByRoom.has(row.space_id)) {
         lastEventByRoom.set(row.space_id, row.received_at);
       }
@@ -158,7 +156,7 @@ export async function GET(request: NextRequest) {
     }
 
     try {
-      const { error } = await sb
+      const { error } = await supabaseAdmin
         .from('juke_spaces')
         .update({ status: 'ended', ended_at: nowIso })
         .eq('id', c.id)
