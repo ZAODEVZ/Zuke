@@ -11,19 +11,20 @@ import {
 import { zukeConfig } from '@/zuke.config';
 
 export const metadata: Metadata = {
-  title: `${zukeConfig.name} x Juke - how we built it`,
+  title: `${zukeConfig.name} - live audio for Farcaster communities`,
   description:
-    'Case study of the ZAO + Juke live audio integration - what we shipped, why, and how you can build with Juke yourself. Build-in-public on juke.audio.',
+    'Zuke is a white-label live audio surface for Farcaster communities. Built on Juke. Open-source, fork-and-deploy.',
   openGraph: {
-    title: `${zukeConfig.name} x Juke`,
-    description: 'We built live audio on Juke. Here is how, and how you can too.',
+    title: `${zukeConfig.name} - live audio for Farcaster communities`,
+    description:
+      'White-label live audio for Farcaster communities. Built on Juke. Fork it, deploy it, host on your own domain.',
     siteName: zukeConfig.name,
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: `${zukeConfig.name} x Juke`,
-    description: 'We built live audio on Juke. Here is how.',
+    title: zukeConfig.name,
+    description: 'Live audio for Farcaster communities.',
   },
 };
 
@@ -44,21 +45,19 @@ async function safeStats(): Promise<JukeIntegrationStats> {
   }
 }
 
+const GITHUB_URL = 'https://github.com/ZAODEVZ/Zuke';
+
 /**
- * /juke - partnership case study + build-in-public landing for the ZAO+Juke
- * integration. Aimed at builders + Farcaster ecosystem folks who want to know
- * "how did ZAO ship this?" before they pitch their own integration to Nicky,
- * or who want to embed Juke on their own surface.
+ * /juke — the Zuke product pitch. Audience: other Farcaster community
+ * operators (and the agents researching for them) who want to embed live
+ * audio on their own surface without standing up their own LiveKit cluster.
  *
- * Pairs with /listen (member-facing pull) and /juke-status (live ops
- * dashboard). This page is the storytelling layer: voice + journey +
- * receipts. Voice per Zaal 2026-05-25 ("build-in-public framing").
- *
- * Data comes from the same jukeIntegrationManifest + juke_spaces stats the
- * dashboard reads, so the "How many shipped" / "How many spaces" numbers stay
- * truthful as we ship more.
+ * The page leads with the product offer, then drops every shipped feature
+ * as receipts (sourced from jukeIntegrationManifest so it auto-updates), and
+ * closes with the three-step deploy-your-own runbook. Pairs with /listen
+ * (member-pull surface) and /juke-status (live ops dashboard).
  */
-export default async function JukeCaseStudyPage() {
+export default async function ZukeProductPage() {
   const manifest = getJukeIntegrationManifest();
   const stats = await safeStats();
   const shippedFeatures = manifest.shipped;
@@ -66,57 +65,66 @@ export default async function JukeCaseStudyPage() {
   return (
     <div className="flex min-h-[100dvh] flex-col bg-[#0a1628] text-white">
       <header className="border-b border-white/[0.08] bg-gradient-to-b from-[#0d1b2a] to-[#0a1628]">
-        <div className="mx-auto w-full max-w-4xl px-4 py-12 sm:py-16">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#f5a623]/10 border border-[#f5a623]/30 text-[#f5a623] text-[10px] font-bold uppercase tracking-wider mb-4">
-            {zukeConfig.name} x Juke - build in public
+        <div className="mx-auto w-full max-w-4xl px-4 py-16 sm:py-20">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#855dcd]/10 border border-[#855dcd]/30 text-[#a78bfa] text-[10px] font-bold uppercase tracking-wider mb-5">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#a78bfa]" aria-hidden="true" />
+            Open source on{' '}
+            <a
+              href={GITHUB_URL}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="underline decoration-[#855dcd]/40 hover:decoration-[#a78bfa]"
+            >
+              GitHub
+            </a>
           </div>
-          <h1 className="text-3xl sm:text-4xl font-bold leading-tight max-w-2xl">
-            We built live audio on Juke.
-            <span className="block text-[#a78bfa]">Come listen.</span>
+          <h1 className="text-4xl sm:text-5xl font-bold leading-tight max-w-2xl">
+            Live audio for Farcaster communities.
+            <span className="block text-[#a78bfa]">White-label. Open. Yours.</span>
           </h1>
-          <p className="mt-4 max-w-xl text-sm sm:text-base text-gray-400 leading-relaxed">
-            {zukeConfig.name} ships live audio on{' '}
+          <p className="mt-5 max-w-xl text-base sm:text-lg text-gray-400 leading-relaxed">
+            {zukeConfig.name} is the white-label live audio surface for
+            Farcaster communities. Powered by{' '}
             <a
               href="https://juke.audio"
               target="_blank"
               rel="noreferrer noopener"
               className="text-gray-200 underline decoration-[#855dcd]/40 hover:decoration-[#a78bfa]"
             >
-              juke.audio
-            </a>{' '}
-            - the Farcaster-native audio app from{' '}
+              Juke
+            </a>
+            . Graduated from the{' '}
             <a
-              href="https://farcaster.xyz/~/profiles/nickysap"
+              href="https://www.thezao.com"
               target="_blank"
               rel="noreferrer noopener"
               className="text-gray-200 underline decoration-[#855dcd]/40 hover:decoration-[#a78bfa]"
             >
-              nickysap
+              ZAO OS
             </a>
-            . Below: what we shipped, the build journey, and the wires for
-            anyone who wants to build with Juke themselves.
+            {' '}lab. Fork, drop in 6 env vars, deploy.
           </p>
-          <div className="mt-6 flex flex-wrap gap-2">
+          <div className="mt-8 flex flex-wrap gap-2">
+            <a
+              href={GITHUB_URL}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="inline-flex items-center px-6 py-3 rounded-xl bg-[#855dcd] hover:bg-[#a78bfa] text-white text-sm font-bold transition-colors"
+            >
+              Fork on GitHub
+            </a>
             <Link
               href="/listen"
-              className="inline-flex items-center px-5 py-2.5 rounded-xl bg-[#f5a623] hover:bg-[#ffd700] text-[#0a1628] text-sm font-bold transition-colors"
+              className="inline-flex items-center px-6 py-3 rounded-xl border border-white/[0.12] bg-[#1a2a3a] hover:bg-[#22364a] text-gray-200 text-sm font-bold transition-colors"
             >
-              Listen now
+              See it live
             </Link>
             <Link
               href="/juke-status"
-              className="inline-flex items-center px-5 py-2.5 rounded-xl border border-white/[0.12] bg-[#1a2a3a] hover:bg-[#22364a] text-gray-200 text-sm font-bold transition-colors"
+              className="inline-flex items-center px-6 py-3 rounded-xl border border-white/[0.12] bg-[#1a2a3a] hover:bg-[#22364a] text-gray-400 text-sm font-bold transition-colors"
             >
-              See the wires
+              Build status
             </Link>
-            <a
-              href="https://juke.audio"
-              target="_blank"
-              rel="noreferrer noopener"
-              className="inline-flex items-center px-5 py-2.5 rounded-xl border border-[#855dcd]/30 bg-[#855dcd]/10 hover:bg-[#855dcd]/20 text-[#a78bfa] text-sm font-bold transition-colors"
-            >
-              Build with Juke →
-            </a>
           </div>
         </div>
       </header>
@@ -124,26 +132,57 @@ export default async function JukeCaseStudyPage() {
       <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-10 space-y-12">
         <StatsStrip stats={stats} shippedCount={shippedFeatures.length} />
 
-        <Section title="Why we built this">
-          <p className="text-sm text-gray-300 leading-relaxed">
-            {zukeConfig.name} runs weekly fractal calls, ZAOstock standups,
-            and ad-hoc rooms - all live audio with Farcaster identity as the
-            ticket. The legacy stack (Stream.io + 100ms) gave us the rooms but
-            not the social graph. Juke gave us both: real-time audio + FID-aware
-            identity in the same handshake.
-          </p>
-          <p className="mt-3 text-sm text-gray-400 leading-relaxed">
-            Five days from first read to full integration. Path A iframe + Path
-            B developer API + outbound webhooks + recap-cast wired into the
-            same /zao channel that runs the community. Build-in-public from
-            line one.
-          </p>
+        <Section title="What you get">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <FeatureCard
+              title="Listen surface"
+              body="Public /listen page. Live now, scheduled next, recording shelf. No auth required to listen - SIWF only for participation."
+            />
+            <FeatureCard
+              title="Host + admin tools"
+              body="/live/create UI plus admin API for programmatic space creation, end-space, recording handling, agent join."
+            />
+            <FeatureCard
+              title="Webhook receiver"
+              body="HMAC-verified inbound webhooks (room.started, finished, participant.*, recording.ready). Idempotent. Auto-cast on recap."
+            />
+            <FeatureCard
+              title="Public status dashboard"
+              body="/juke-status mirrors what you shipped + recent webhook deliveries + open asks. JSON + markdown + HTML, all in sync."
+            />
+          </div>
         </Section>
 
-        <Section title="The build">
+        <Section title="Why Zuke, not raw Juke">
+          <ul className="space-y-3 text-sm text-gray-300 leading-relaxed">
+            <li>
+              <strong className="text-white">Your domain.</strong> Listeners
+              land at <code className="text-[#a78bfa]">audio.yourbrand.com</code>,
+              not <code>juke.audio/space/xyz</code>. Cast unfurls show your
+              card.
+            </li>
+            <li>
+              <strong className="text-white">Your database.</strong> All space
+              metadata, participant counts, recordings land in your Supabase -
+              queryable from your existing community tooling.
+            </li>
+            <li>
+              <strong className="text-white">Your integrations.</strong> Recap
+              casts from your own community account, custom CTAs on the live
+              page, agent participants tied to your accounts.
+            </li>
+            <li>
+              <strong className="text-white">No infra.</strong> Juke runs the
+              LiveKit cluster, the iOS app, the iframe. You ship a Vercel
+              project + a Supabase + 6 env vars.
+            </li>
+          </ul>
+        </Section>
+
+        <Section title="The build - every feature, newest first">
           <p className="text-xs text-gray-500 mb-4">
-            Every shipped feature, newest first. Each row links to the PR or the
-            files that landed it.
+            Sourced from <code>jukeIntegrationManifest</code>. Every PR linked
+            where one exists. Auto-updates as we ship.
           </p>
           <ol className="space-y-3">
             {shippedFeatures
@@ -155,44 +194,94 @@ export default async function JukeCaseStudyPage() {
           </ol>
         </Section>
 
-        <Section title="Screenshots">
-          <p className="text-xs text-gray-500 mb-4">
-            Live tour - drop screenshots in as we go. Today this section is a
-            placeholder; Zaal grabs shots on the next run-through.
-          </p>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {[
-              'Host page on /live/{id} with End-space + listener badge',
-              'Public /juke-status dashboard with tabs',
-              'Recap cast in /zao on Farcaster',
-              'Juke iframe with SSO bridge (no QR)',
-            ].map((label) => (
-              <div
-                key={label}
-                className="aspect-[1200/630] rounded-xl border border-dashed border-white/[0.12] bg-[#0d1b2a]/40 flex items-center justify-center p-4 text-center"
-              >
-                <p className="text-[11px] text-gray-500 leading-relaxed">{label}</p>
-              </div>
-            ))}
-          </div>
+        <Section title="Deploy your own">
+          <DeployStep
+            num={1}
+            title="Fork the repo"
+            body={
+              <>
+                <p className="text-sm text-gray-300">
+                  <a
+                    href={GITHUB_URL}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="text-[#a78bfa] hover:underline"
+                  >
+                    github.com/ZAODEVZ/Zuke
+                  </a>
+                  . MIT-style license. Next.js 16 + Supabase + Juke developer API.
+                </p>
+                <CodeBlock>git clone https://github.com/ZAODEVZ/Zuke.git</CodeBlock>
+              </>
+            }
+          />
+          <DeployStep
+            num={2}
+            title="Provision Supabase + apply migrations"
+            body={
+              <>
+                <p className="text-sm text-gray-300">
+                  Create a Supabase project. Apply the two migration files in{' '}
+                  <code className="text-[#a78bfa]">scripts/</code>:
+                </p>
+                <CodeBlock>{`scripts/juke-spaces-migration.sql
+scripts/juke-spaces-migration-2.sql`}</CodeBlock>
+              </>
+            }
+          />
+          <DeployStep
+            num={3}
+            title="Set 6 env vars + register the webhook"
+            body={
+              <>
+                <p className="text-sm text-gray-300">
+                  Apply for a Juke developer key at{' '}
+                  <a
+                    href="https://juke.audio/developers"
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="text-[#a78bfa] hover:underline"
+                  >
+                    juke.audio/developers
+                  </a>
+                  . Then in Vercel:
+                </p>
+                <CodeBlock>{`NEXT_PUBLIC_SUPABASE_URL
+SUPABASE_SERVICE_ROLE_KEY
+JUKE_API_KEY
+JUKE_WEBHOOK_SECRET   # filled by step-6 webhook register
+ZUKE_ADMIN_PASSWORD
+CRON_SECRET`}</CodeBlock>
+                <p className="text-xs text-gray-500 mt-2">
+                  Deploy. Hit{' '}
+                  <code className="text-[#a78bfa]">
+                    POST /api/juke/admin/register-webhook
+                  </code>{' '}
+                  with the admin cookie. Copy the returned <code>whsec_</code>{' '}
+                  into <code>JUKE_WEBHOOK_SECRET</code>, redeploy.
+                </p>
+              </>
+            }
+          />
         </Section>
 
-        <Section title="Build with Juke">
+        <Section title="Resources">
           <div className="grid gap-3 sm:grid-cols-3">
             <ResourceCard
-              label="llms.txt"
+              label="Juke llms.txt"
               href="https://juke.audio/llms.txt"
-              hint="Canonical machine-readable spec - feed this to your AI."
+              hint="Canonical machine-readable Juke spec. Feed this to your agent."
             />
             <ResourceCard
-              label="changelog.json"
-              href="https://juke.audio/changelog.json"
-              hint="Auto-polled by /juke-status to flip resolved asks green."
+              label="Zuke integration manifest"
+              href="/juke-integration.md"
+              hint="Our llms.txt-style mirror - shipped features + open asks."
+              internal
             />
             <ResourceCard
-              label="Our wires"
+              label="Build status"
               href="/juke-status"
-              hint="HTML dashboard + JSON + markdown mirrors of this integration."
+              hint="HTML dashboard + JSON + markdown of the live integration."
               internal
             />
           </div>
@@ -207,30 +296,35 @@ export default async function JukeCaseStudyPage() {
               href="https://juke.audio"
               target="_blank"
               rel="noreferrer noopener"
-              className="text-gray-300 hover:text-[#f5a623]"
+              className="text-gray-300 hover:text-[#a78bfa]"
             >
               Juke
-            </a>{' '}
-            - thanks{' '}
+            </a>
+            {' '}- thanks{' '}
             <a
               href="https://farcaster.xyz/~/profiles/nickysap"
               target="_blank"
               rel="noreferrer noopener"
-              className="text-gray-300 hover:text-[#f5a623]"
+              className="text-gray-300 hover:text-[#a78bfa]"
             >
               @nickysap
             </a>
             .
           </span>
           <div className="flex gap-3 text-[11px]">
-            <Link href="/listen" className="text-gray-400 hover:text-[#f5a623]">
-              Listen now
+            <a
+              href={GITHUB_URL}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="text-gray-400 hover:text-[#a78bfa]"
+            >
+              GitHub
+            </a>
+            <Link href="/listen" className="text-gray-400 hover:text-[#a78bfa]">
+              Demo
             </Link>
-            <Link href="/juke-status" className="text-gray-400 hover:text-[#f5a623]">
-              Build status
-            </Link>
-            <Link href="/juke-integration.md" className="text-gray-400 hover:text-[#f5a623]">
-              llms.txt mirror
+            <Link href="/juke-integration.md" className="text-gray-400 hover:text-[#a78bfa]">
+              llms.txt
             </Link>
           </div>
         </div>
@@ -248,7 +342,7 @@ function StatsStrip({
 }) {
   const items = [
     { value: shippedCount, label: 'Features shipped' },
-    { value: stats.total_spaces, label: 'Spaces created' },
+    { value: stats.total_spaces, label: 'Spaces hosted' },
     { value: stats.with_recording, label: 'With recording' },
     { value: stats.total_webhook_events, label: 'Webhook events' },
   ];
@@ -282,6 +376,45 @@ function Section({
   );
 }
 
+function FeatureCard({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="rounded-xl border border-white/[0.08] bg-[#111d2e] p-4">
+      <p className="text-sm font-bold text-white">{title}</p>
+      <p className="mt-1 text-xs text-gray-400 leading-relaxed">{body}</p>
+    </div>
+  );
+}
+
+function DeployStep({
+  num,
+  title,
+  body,
+}: {
+  num: number;
+  title: string;
+  body: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-xl border border-white/[0.08] bg-[#111d2e] p-5 mb-3">
+      <div className="flex items-center gap-3 mb-3">
+        <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#855dcd]/20 text-[#a78bfa] text-xs font-bold">
+          {num}
+        </span>
+        <h3 className="text-sm font-bold text-white">{title}</h3>
+      </div>
+      {body}
+    </div>
+  );
+}
+
+function CodeBlock({ children }: { children: React.ReactNode }) {
+  return (
+    <pre className="mt-2 overflow-x-auto rounded-lg border border-white/[0.08] bg-[#0a1628] p-3 text-[11px] leading-relaxed text-gray-300 font-mono">
+      {children}
+    </pre>
+  );
+}
+
 function BuildRow({ feature }: { feature: ShippedFeature }) {
   return (
     <li className="rounded-xl border border-white/[0.08] bg-[#111d2e] p-4">
@@ -293,7 +426,7 @@ function BuildRow({ feature }: { feature: ShippedFeature }) {
             href={feature.pr}
             target="_blank"
             rel="noreferrer noopener"
-            className="text-[10px] text-[#f5a623] hover:underline"
+            className="text-[10px] text-[#a78bfa] hover:underline"
           >
             View PR
           </a>
@@ -319,7 +452,7 @@ function ResourceCard({
     return (
       <Link
         href={href}
-        className="block rounded-xl border border-white/[0.08] bg-[#111d2e] p-4 hover:border-[#f5a623]/30 transition-colors"
+        className="block rounded-xl border border-white/[0.08] bg-[#111d2e] p-4 hover:border-[#a78bfa]/30 transition-colors"
       >
         <p className="text-sm font-bold text-white">{label}</p>
         <p className="text-[11px] text-gray-500 mt-1 leading-relaxed">{hint}</p>
