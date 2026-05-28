@@ -1,3 +1,10 @@
+function parseFidList(raw: string): number[] {
+  return raw
+    .split(',')
+    .map((s) => parseInt(s.trim(), 10))
+    .filter((n) => Number.isFinite(n) && n > 0);
+}
+
 export const ENV = {
   JUKE_API_KEY: process.env.JUKE_API_KEY ?? '',
   JUKE_WEBHOOK_SECRET: process.env.JUKE_WEBHOOK_SECRET ?? '',
@@ -5,4 +12,7 @@ export const ENV = {
   ZUKE_ADMIN_PASSWORD: process.env.ZUKE_ADMIN_PASSWORD ?? '',
   SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL ?? '',
   SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ?? '',
+  SESSION_SECRET: process.env.SESSION_SECRET ?? '',
+  ZUKE_ADMIN_FIDS: parseFidList(process.env.ZUKE_ADMIN_FIDS ?? ''),
+  OPTIMISM_RPC_URL: process.env.NEXT_PUBLIC_OPTIMISM_RPC_URL ?? 'https://optimism-rpc.publicnode.com',
 };
