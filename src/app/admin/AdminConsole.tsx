@@ -46,7 +46,7 @@ export function AdminConsole() {
   const [createTitle, setCreateTitle] = useState('Zuke test space');
   const [announceCast, setAnnounceCast] = useState(false);
   const [allowAgents, setAllowAgents] = useState(true);
-  const [recording, setRecording] = useState(true);
+  const [record, setRecord] = useState(true);
   const [createResult, setCreateResult] = useState<Result | null>(null);
   const [createBusy, setCreateBusy] = useState(false);
 
@@ -65,7 +65,7 @@ export function AdminConsole() {
         title: createTitle,
         announceCast,
         allowAgents,
-        recording,
+        record,
       });
       setCreateResult(result);
       const id = (result.body as { data?: { id?: string } })?.data?.id;
@@ -141,8 +141,8 @@ export function AdminConsole() {
           <label className="flex items-center gap-2">
             <input
               type="checkbox"
-              checked={recording}
-              onChange={(e) => setRecording(e.target.checked)}
+              checked={record}
+              onChange={(e) => setRecord(e.target.checked)}
             />
             Recording
           </label>

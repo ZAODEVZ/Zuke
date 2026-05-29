@@ -164,10 +164,16 @@ export async function createJukeSpace(
   }
 
   if (!response.ok) {
+    let detail = '';
+    try {
+      detail = (await response.text()).slice(0, 400);
+    } catch {}
     return {
       ok: false,
       status: response.status,
-      error: `Juke API returned ${response.status}`,
+      error: detail
+        ? `Juke API returned ${response.status}: ${detail}`
+        : `Juke API returned ${response.status}`,
     };
   }
 
