@@ -12,6 +12,7 @@ Follow these steps to provision and deploy Zuke.
 npx tsx scripts/register-juke-webhook.ts  # If needed
 psql -U postgres -d zuke_db -f scripts/juke-spaces-migration.sql
 psql -U postgres -d zuke_db -f scripts/juke-spaces-migration-2.sql
+psql -U postgres -d zuke_db -f scripts/juke-spaces-migration-3.sql
 ```
 
 ## Step 2 - Juke API Key
