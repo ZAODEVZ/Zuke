@@ -60,19 +60,22 @@ export async function generateMetadata({ params }: LivePageProps): Promise<Metad
   }
   const row = await safeGetJukeSpace(spaceId);
   const title = row?.title ? `${row.title} - Live on ${zukeConfig.name}` : `Live Audio - ${zukeConfig.name}`;
-  const ogImage = jukeSpaceOgImageUrl(spaceId);
+  // Only Juke-hosted spaces have a juke.audio OG card; imported spaces (e.g. an
+  // X Space tagged 'songjam') would 404 that image, so omit it for them.
+  const isJukeHosted = !row || (row.provider ?? 'juke') === 'juke';
+  const ogImage = isJukeHosted ? jukeSpaceOgImageUrl(spaceId) : null;
   return {
     title,
     description: `Listen in to a live audio space on Juke, the Farcaster-native audio app.`,
     robots: { index: false },
     openGraph: {
       title,
-      images: [{ url: ogImage }],
+      ...(ogImage ? { images: [{ url: ogImage }] } : {}),
     },
     twitter: {
       card: 'summary_large_image',
       title,
-      images: [ogImage],
+      ...(ogImage ? { images: [ogImage] } : {}),
     },
   };
 }

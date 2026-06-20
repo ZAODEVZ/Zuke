@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 /** Serializable view of a juke_recordings row (mirror of RecordingRow). */
 export interface RecordingView {
   id: string;
-  source: 'juke' | 'upload' | 'snippet';
+  source: 'juke' | 'upload' | 'snippet' | 'import';
   parent_id: string | null;
   title: string | null;
   url: string;
@@ -26,6 +26,7 @@ const SOURCE_LABEL: Record<RecordingView['source'], string> = {
   juke: 'Juke',
   upload: 'Upload',
   snippet: 'Snippet',
+  import: 'X Space',
 };
 
 function fmtClock(totalSeconds: number): string {

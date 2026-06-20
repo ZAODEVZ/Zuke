@@ -21,7 +21,7 @@ import type { LiveAudioProviderId } from './providers/types';
 const sb = supabaseAdmin as any;
 
 /** Where a recording came from. */
-export type RecordingSource = 'juke' | 'upload' | 'snippet';
+export type RecordingSource = 'juke' | 'upload' | 'snippet' | 'import';
 
 export interface RecordingRow {
   id: string;

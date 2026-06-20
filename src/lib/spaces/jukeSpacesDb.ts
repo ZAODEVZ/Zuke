@@ -6,6 +6,7 @@
  * recording. `/live/{id}` reads via {@link getJukeSpace}.
  */
 import { supabaseAdmin } from '@/lib/db/supabase';
+import type { LiveAudioProviderId } from './providers/types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const sb = supabaseAdmin as any;
@@ -26,6 +27,9 @@ export interface JukeSpaceRow {
   id: string;
   title: string;
   status: JukeSpaceStatus;
+  /** Live-audio backend that owns this row (migration #3). Older rows default
+   * to 'juke'. Imported X Spaces are tagged 'songjam'. */
+  provider: LiveAudioProviderId;
   created_by_fid: number;
   scheduled_at: string | null;
   started_at: string | null;
@@ -65,6 +69,63 @@ export async function insertJukeSpace(input: JukeSpaceInsert): Promise<void> {
     { onConflict: 'id' },
   );
   if (error) throw new Error(`insertJukeSpace failed: ${error.message}`);
+}
+
+/** An externally-sourced space being imported (e.g. a past X Space). */
+export interface ImportedSpaceInsert {
+  id: string;
+  title: string;
+  provider: LiveAudioProviderId;
+  createdByFid: number;
+  /** Audio for the (already-ended) space, if known at import time. */
+  recordingUrl?: string | null;
+  /** Provider-specific metadata (X Space url + id, importer, ...). */
+  raw?: unknown;
+}
+
+/**
+ * Insert an already-ended space imported from another platform. Unlike
+ * {@link insertJukeSpace} this writes `provider` + `status='ended'` and sets
+ * `ended_at` to now, because an import is a past room with no live lifecycle.
+ * Idempotent (upsert on id) so re-importing the same X Space refreshes it
+ * rather than erroring.
+ */
+export async function insertImportedSpace(input: ImportedSpaceInsert): Promise<void> {
+  const nowIso = new Date().toISOString();
+  const { error } = await sb.from('juke_spaces').upsert(
+    {
+      id: input.id,
+      title: input.title,
+      status: 'ended' as JukeSpaceStatus,
+      provider: input.provider,
+      created_by_fid: input.createdByFid,
+      recording_url: input.recordingUrl ?? null,
+      ended_at: nowIso,
+      raw: input.raw ?? null,
+    },
+    { onConflict: 'id' },
+  );
+  if (error) {
+    // provider column missing = migration #3 not applied; retry without it so
+    // the import still works on a partially-migrated DB.
+    if (/column .*provider/i.test(error.message)) {
+      const { error: retryError } = await sb.from('juke_spaces').upsert(
+        {
+          id: input.id,
+          title: input.title,
+          status: 'ended' as JukeSpaceStatus,
+          created_by_fid: input.createdByFid,
+          recording_url: input.recordingUrl ?? null,
+          ended_at: nowIso,
+          raw: input.raw ?? null,
+        },
+        { onConflict: 'id' },
+      );
+      if (retryError) throw new Error(`insertImportedSpace failed: ${retryError.message}`);
+      return;
+    }
+    throw new Error(`insertImportedSpace failed: ${error.message}`);
+  }
 }
 
 /** Read one Juke space row by id — used by `/live/{id}` SSR. */
