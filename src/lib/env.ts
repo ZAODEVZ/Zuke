@@ -13,6 +13,13 @@ export const ENV = {
   SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL ?? '',
   SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ?? '',
   SESSION_SECRET: process.env.SESSION_SECRET ?? '',
+  /**
+   * Neynar API key — resolves Farcaster usernames + PFPs for the recap
+   * pipeline bridge (GET /api/recordings/recap). Server-only; the juke-space-
+   * recap Remotion tool consumes the JSON this produces. Unset = the recap
+   * endpoint returns participants without enriched PFPs rather than failing.
+   */
+  NEYNAR_API_KEY: process.env.NEYNAR_API_KEY ?? '',
   ZUKE_ADMIN_FIDS: parseFidList(process.env.ZUKE_ADMIN_FIDS ?? ''),
   OPTIMISM_RPC_URL: process.env.NEXT_PUBLIC_OPTIMISM_RPC_URL ?? 'https://optimism-rpc.publicnode.com',
 };

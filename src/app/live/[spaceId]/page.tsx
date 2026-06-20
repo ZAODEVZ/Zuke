@@ -5,6 +5,7 @@ import { getSessionData } from '@/lib/auth/session';
 import { EndJukeSpaceButton } from '@/components/spaces/EndJukeSpaceButton';
 import { JukeEmbed } from '@/components/spaces/JukeEmbed';
 import { JukeListenerBadge } from '@/components/spaces/JukeListenerBadge';
+import { RecordingsManager, type RecordingView } from '@/components/spaces/RecordingsManager';
 import {
   isValidJukeSpaceId,
   jukeAppDeeplinkUrl,
@@ -12,7 +13,27 @@ import {
   jukeSpaceUrl,
 } from '@/lib/spaces/juke';
 import { getJukeSpace, type JukeSpaceRow } from '@/lib/spaces/jukeSpacesDb';
+import { listRecordingsForSpace } from '@/lib/spaces/recordingsDb';
 import { zukeConfig } from '@/zuke.config';
+
+/** Recordings for a space — empty on any failure so the page never 500s. */
+async function safeListRecordings(id: string): Promise<RecordingView[]> {
+  try {
+    const rows = await listRecordingsForSpace(id);
+    return rows.map((r) => ({
+      id: r.id,
+      source: r.source,
+      parent_id: r.parent_id,
+      title: r.title,
+      url: r.url,
+      duration_seconds: r.duration_seconds,
+      start_seconds: r.start_seconds,
+      end_seconds: r.end_seconds,
+    }));
+  } catch {
+    return [];
+  }
+}
 
 interface LivePageProps {
   params: Promise<{ spaceId: string }>;
@@ -79,10 +100,21 @@ export default async function LivePage({ params, searchParams }: LivePageProps) 
     notFound();
   }
 
-  const [row, session] = await Promise.all([safeGetJukeSpace(spaceId), getSessionData()]);
+  const [row, session, recordings] = await Promise.all([
+    safeGetJukeSpace(spaceId),
+    getSessionData(),
+    safeListRecordings(spaceId),
+  ]);
   const audioOff = audio === 'off';
   const isEnded = row?.status === 'ended';
   const recordingUrl = row?.recording_url ?? null;
+  // Host/admin may upload recordings, cut snippets, and export recap inputs —
+  // available regardless of live/ended state.
+  const canManageRecordings = Boolean(
+    row?.created_by_fid &&
+      session?.fid &&
+      (session.isAdmin || row.created_by_fid === session.fid),
+  );
   // Host-or-admin gate for the End space button. Iframe Leave is participant-
   // only (LiveKit disconnect, no API hit), so without this the room stays
   // ACTIVE in our DB forever; the button calls our admin endpoint that proxies
@@ -185,6 +217,14 @@ export default async function LivePage({ params, searchParams }: LivePageProps) 
             </Link>
           )}
         </div>
+
+        {(recordings.length > 0 || canManageRecordings) && (
+          <RecordingsManager
+            spaceId={spaceId}
+            canManage={canManageRecordings}
+            recordings={recordings}
+          />
+        )}
 
         {canEnd && (
           <div className="flex flex-col items-center gap-1.5 pt-2">
