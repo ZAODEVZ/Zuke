@@ -26,7 +26,14 @@ import { parseXSpaceUrl, X_SPACE_PROVIDER } from '@/lib/spaces/xSpaces';
 const bodySchema = z.object({
   url: z.string().trim().min(1, 'X Space URL or id required'),
   title: z.string().trim().min(1).max(200),
-  audioUrl: z.string().trim().url().optional(),
+  // https-only: the URL is stored and rendered in <audio src> / <a href>;
+  // restricting the scheme prevents javascript: or file: from reaching the DOM.
+  audioUrl: z
+    .string()
+    .trim()
+    .url()
+    .refine((u) => u.startsWith('https://'), { message: 'audioUrl must be an https:// URL' })
+    .optional(),
 });
 
 export async function POST(request: NextRequest): Promise<NextResponse> {

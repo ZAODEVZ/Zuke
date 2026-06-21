@@ -128,6 +128,19 @@ export async function insertImportedSpace(input: ImportedSpaceInsert): Promise<v
   }
 }
 
+/** Fetch multiple space rows by id in a single query. Any unknown ids are
+ * silently omitted. Used by the recordings shelf to hydrate space metadata
+ * for spaces that have audio in juke_recordings but no recording_url set. */
+export async function getJukeSpacesByIds(ids: string[]): Promise<JukeSpaceRow[]> {
+  if (ids.length === 0) return [];
+  const { data, error } = await supabaseAdmin
+    .from('juke_spaces')
+    .select('*')
+    .in('id', ids);
+  if (error) throw new Error(`getJukeSpacesByIds failed: ${error.message}`);
+  return (data ?? []) as JukeSpaceRow[];
+}
+
 /** Read one Juke space row by id — used by `/live/{id}` SSR. */
 export async function getJukeSpace(id: string): Promise<JukeSpaceRow | null> {
   const { data, error } = await supabaseAdmin
