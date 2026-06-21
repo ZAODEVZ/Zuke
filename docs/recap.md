@@ -13,6 +13,10 @@ A space (`juke_spaces` row) can have many recordings (`juke_recordings` rows):
 | `upload`  | A host/admin uploads audio via `POST /api/recordings/upload`         |
 | `snippet` | A clip of a parent recording via `POST /api/recordings/snippet`      |
 | `import`  | Audio of an imported X Space (`POST /api/recordings/import-x`)       |
+| `recap`   | The rendered recap **video**, attached by URL (see below)           |
+
+Each row also has a `kind` (`audio` or `video`). Everything is `audio` except a
+`recap` row, which holds the `video` output of the pipeline.
 
 ## Importing an X (Twitter) Space
 
@@ -86,8 +90,26 @@ On the space page, the **Recap inputs** button downloads this as
    Zuke recap-inputs JSON pre-fills the per-guest `@username` step for everyone
    Zuke already tracked joining, so you only hand-label guests we missed.
 
+### Attaching the finished recap video
+
+Once the render produces an MP4, bring it back into Zuke so it lives on the
+space page next to the audio:
+
+1. Host the file somewhere with an `https://` URL. An 84-min 1080p render is
+   1–2 GB — far past any serverless request-body limit — so Zuke does **not**
+   accept a file upload for it. Put it on Supabase Storage (resumable upload),
+   your own CDN, or any host that serves a direct MP4 URL.
+2. On the space page, **Attach a recap video** → paste the URL. Or
+   `POST /api/recordings/recap-video` with `{ spaceId, videoUrl, title? }`
+   (host/admin, `https://` only).
+3. It lands as a `source='recap'`, `kind='video'` row and plays inline in a
+   `<video>` element. The recap-inputs export ignores it (it is output, not a
+   pipeline input), so re-exporting never feeds the video back in as audio.
+
 ## Config
 
 - Apply `scripts/juke-spaces-migration-4.sql` (adds `juke_recordings` + the
   public `recordings` storage bucket).
+- Apply `scripts/juke-spaces-migration-5.sql` (adds the `kind` column so a
+  recap **video** can be attached; audio uploads work without it).
 - Set `NEYNAR_API_KEY` for PFP/username enrichment (optional).

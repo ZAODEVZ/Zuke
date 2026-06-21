@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getSessionData } from '@/lib/auth/session';
 import { logger } from '@/lib/logger';
-import { isValidJukeSpaceId } from '@/lib/spaces/juke';
 import { getJukeSpace } from '@/lib/spaces/jukeSpacesDb';
 import { countRecordingsForSpace, insertRecording } from '@/lib/spaces/recordingsDb';
+import { isValidSpaceId } from '@/lib/spaces/spaceId';
 import {
   ALLOWED_AUDIO_TYPES,
   MAX_UPLOAD_BYTES,
@@ -29,7 +29,7 @@ import {
 const ACCEPTED = new Set<string>(ALLOWED_AUDIO_TYPES);
 
 const fieldsSchema = z.object({
-  spaceId: z.string().refine(isValidJukeSpaceId, { message: 'Invalid space id' }),
+  spaceId: z.string().refine(isValidSpaceId, { message: 'Invalid space id' }),
   title: z.string().trim().max(200).optional(),
 });
 

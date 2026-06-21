@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSessionData } from '@/lib/auth/session';
 import { ENV } from '@/lib/env';
 import { logger } from '@/lib/logger';
-import { isValidJukeSpaceId } from '@/lib/spaces/juke';
 import { getJukeSpace } from '@/lib/spaces/jukeSpacesDb';
 import { listRecordingsForSpace } from '@/lib/spaces/recordingsDb';
+import { isValidSpaceId } from '@/lib/spaces/spaceId';
 import { fetchProfilesByFids, type FarcasterProfile } from '@/lib/farcaster/neynar';
 
 /**
@@ -59,7 +59,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   const spaceId = request.nextUrl.searchParams.get('spaceId');
-  if (!spaceId || !isValidJukeSpaceId(spaceId)) {
+  if (!spaceId || !isValidSpaceId(spaceId)) {
     return NextResponse.json({ ok: false, error: 'Invalid or missing spaceId' }, { status: 400 });
   }
 
@@ -84,7 +84,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const audio: RecapAudioPart[] =
     recordings.length > 0
       ? recordings
-          .filter((r) => r.source !== 'snippet')
+          // Exclude snippets (clips) and the recap video itself (kind='video' /
+          // source='recap') — the pipeline wants full audio inputs, not its own
+          // rendered output.
+          .filter((r) => r.source !== 'snippet' && r.source !== 'recap' && r.kind !== 'video')
           .map((r) => ({
             url: r.url,
             title: r.title,

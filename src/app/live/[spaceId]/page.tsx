@@ -7,13 +7,13 @@ import { JukeEmbed } from '@/components/spaces/JukeEmbed';
 import { JukeListenerBadge } from '@/components/spaces/JukeListenerBadge';
 import { RecordingsManager, type RecordingView } from '@/components/spaces/RecordingsManager';
 import {
-  isValidJukeSpaceId,
   jukeAppDeeplinkUrl,
   jukeSpaceOgImageUrl,
   jukeSpaceUrl,
 } from '@/lib/spaces/juke';
 import { getJukeSpace, type JukeSpaceRow } from '@/lib/spaces/jukeSpacesDb';
 import { listRecordingsForSpace } from '@/lib/spaces/recordingsDb';
+import { isValidSpaceId } from '@/lib/spaces/spaceId';
 import { zukeConfig } from '@/zuke.config';
 
 /** Recordings for a space — empty on any failure so the page never 500s. */
@@ -23,6 +23,7 @@ async function safeListRecordings(id: string): Promise<RecordingView[]> {
     return rows.map((r) => ({
       id: r.id,
       source: r.source,
+      kind: r.kind ?? 'audio',
       parent_id: r.parent_id,
       title: r.title,
       url: r.url,
@@ -55,7 +56,7 @@ async function safeGetJukeSpace(id: string): Promise<JukeSpaceRow | null> {
 
 export async function generateMetadata({ params }: LivePageProps): Promise<Metadata> {
   const { spaceId } = await params;
-  if (!isValidJukeSpaceId(spaceId)) {
+  if (!isValidSpaceId(spaceId)) {
     return { title: `Live Audio - ${zukeConfig.name}` };
   }
   const row = await safeGetJukeSpace(spaceId);
@@ -97,9 +98,9 @@ export default async function LivePage({ params, searchParams }: LivePageProps) 
   const { spaceId } = await params;
   const { audio } = await searchParams;
 
-  // Untrusted path segment — reject anything that is not a Juke space id
-  // before it can reach the embed URL.
-  if (!isValidJukeSpaceId(spaceId)) {
+  // Untrusted path segment — reject anything that is not a known Zuke space id
+  // (a native Juke id or an imported `x-…` X Space) before it reaches the embed.
+  if (!isValidSpaceId(spaceId)) {
     notFound();
   }
 
@@ -111,6 +112,22 @@ export default async function LivePage({ params, searchParams }: LivePageProps) 
   const audioOff = audio === 'off';
   const isEnded = row?.status === 'ended';
   const recordingUrl = row?.recording_url ?? null;
+  // "Juke-hosted" is determined by the row's provider, not the id shape — the
+  // Juke id pattern is permissive enough to also match imported `x-…` ids. A
+  // missing row (DB never saw the create) defaults to Juke so a native room
+  // still renders the embed and degrades gracefully.
+  const isJukeHosted = !row || (row.provider ?? 'juke') === 'juke';
+  // The live Juke iframe is only for native Juke rooms that are still open.
+  // Imported X Spaces are always ended and show their recording(s) instead.
+  const showEmbed = isJukeHosted && !isEnded;
+  // Link back to the original X Space for imported rows (raw.x_url is set by
+  // /api/recordings/import-x). Defensive read — raw is unknown-typed jsonb.
+  const importedXUrl =
+    !isJukeHosted && row?.raw && typeof row.raw === 'object'
+      ? typeof (row.raw as { x_url?: unknown }).x_url === 'string'
+        ? (row.raw as { x_url: string }).x_url
+        : null
+      : null;
   // Host/admin may upload recordings, cut snippets, and export recap inputs —
   // available regardless of live/ended state.
   const canManageRecordings = Boolean(
@@ -172,52 +189,72 @@ export default async function LivePage({ params, searchParams }: LivePageProps) 
             participantCount={row?.participant_count ?? 0}
           />
         )}
-        {isEnded && recordingUrl ? (
-          <div className="w-full max-w-md flex flex-col gap-3 bg-[#0d1b2a] border border-white/[0.08] rounded-2xl p-6 text-center">
-            <h2 className="text-white font-bold text-base">This space has ended</h2>
-            <p className="text-gray-500 text-xs">A recording is available.</p>
-            <a
-              href={recordingUrl}
-              target="_blank"
-              rel="noreferrer noopener"
-              className="px-5 py-2.5 rounded-xl bg-[#f5a623] hover:bg-[#ffd700] text-[#0a1628] font-bold text-sm transition-colors"
-            >
-              Listen to the recording
-            </a>
-          </div>
-        ) : isEnded ? (
-          <div className="w-full max-w-md flex flex-col gap-3 bg-[#0d1b2a] border border-white/[0.08] rounded-2xl p-6 text-center">
-            <h2 className="text-white font-bold text-base">This space has ended</h2>
-            <p className="text-gray-500 text-xs">No recording was made.</p>
-          </div>
-        ) : (
+        {showEmbed ? (
           <JukeEmbed spaceId={spaceId} audioOff={audioOff} useSsoToken />
+        ) : (
+          <div className="w-full max-w-md flex flex-col gap-3 bg-[#0d1b2a] border border-white/[0.08] rounded-2xl p-6 text-center">
+            <h2 className="text-white font-bold text-base">
+              {isJukeHosted ? 'This space has ended' : 'Imported space'}
+            </h2>
+            {recordingUrl ? (
+              <>
+                <p className="text-gray-500 text-xs">A recording is available.</p>
+                <a
+                  href={recordingUrl}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="px-5 py-2.5 rounded-xl bg-[#f5a623] hover:bg-[#ffd700] text-[#0a1628] font-bold text-sm transition-colors"
+                >
+                  Listen to the recording
+                </a>
+              </>
+            ) : recordings.length > 0 ? (
+              <p className="text-gray-500 text-xs">Recordings are available below.</p>
+            ) : (
+              <p className="text-gray-500 text-xs">No recording yet.</p>
+            )}
+          </div>
         )}
 
         <div className="flex flex-wrap gap-2 justify-center">
-          <a
-            href={jukeAppDeeplinkUrl(spaceId)}
-            target="_blank"
-            rel="noreferrer noopener"
-            className="px-4 py-2 rounded-xl border border-white/[0.12] bg-[#1a2a3a] text-gray-300 text-xs font-semibold hover:bg-[#22364a] transition-colors"
-          >
-            Open in Juke app
-          </a>
-          <a
-            href={jukeSpaceUrl(spaceId)}
-            target="_blank"
-            rel="noreferrer noopener"
-            className="px-4 py-2 rounded-xl border border-white/[0.12] bg-[#1a2a3a] text-gray-400 text-xs font-semibold hover:bg-[#22364a] transition-colors"
-          >
-            Share page
-          </a>
-          {!audioOff && !isEnded && (
-            <Link
-              href={`/live/${spaceId}?audio=off`}
-              className="px-4 py-2 rounded-xl border border-white/[0.12] bg-[#1a2a3a] text-gray-400 text-xs font-semibold hover:bg-[#22364a] transition-colors"
-            >
-              Mute (second screen)
-            </Link>
+          {isJukeHosted ? (
+            <>
+              <a
+                href={jukeAppDeeplinkUrl(spaceId)}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="px-4 py-2 rounded-xl border border-white/[0.12] bg-[#1a2a3a] text-gray-300 text-xs font-semibold hover:bg-[#22364a] transition-colors"
+              >
+                Open in Juke app
+              </a>
+              <a
+                href={jukeSpaceUrl(spaceId)}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="px-4 py-2 rounded-xl border border-white/[0.12] bg-[#1a2a3a] text-gray-400 text-xs font-semibold hover:bg-[#22364a] transition-colors"
+              >
+                Share page
+              </a>
+              {!audioOff && !isEnded && (
+                <Link
+                  href={`/live/${spaceId}?audio=off`}
+                  className="px-4 py-2 rounded-xl border border-white/[0.12] bg-[#1a2a3a] text-gray-400 text-xs font-semibold hover:bg-[#22364a] transition-colors"
+                >
+                  Mute (second screen)
+                </Link>
+              )}
+            </>
+          ) : (
+            importedXUrl && (
+              <a
+                href={importedXUrl}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="px-4 py-2 rounded-xl border border-white/[0.12] bg-[#1a2a3a] text-gray-300 text-xs font-semibold hover:bg-[#22364a] transition-colors"
+              >
+                Open original on X
+              </a>
+            )
           )}
         </div>
 

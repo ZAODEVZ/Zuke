@@ -20,14 +20,19 @@ import type { LiveAudioProviderId } from './providers/types';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const sb = supabaseAdmin as any;
 
-/** Where a recording came from. */
-export type RecordingSource = 'juke' | 'upload' | 'snippet' | 'import';
+/** Where a recording came from. 'recap' is the rendered recap VIDEO (output of
+ * the juke-space-recap pipeline), attached back to its space by URL. */
+export type RecordingSource = 'juke' | 'upload' | 'snippet' | 'import' | 'recap';
+
+/** Whether the row points at an audio file or a video (the recap render). */
+export type RecordingKind = 'audio' | 'video';
 
 export interface RecordingRow {
   id: string;
   space_id: string;
   provider: LiveAudioProviderId;
   source: RecordingSource;
+  kind: RecordingKind;
   parent_id: string | null;
   part_index: number;
   title: string | null;
@@ -50,6 +55,7 @@ export interface InsertRecordingInput {
   spaceId: string;
   url: string;
   source: RecordingSource;
+  kind?: RecordingKind;
   provider?: LiveAudioProviderId;
   parentId?: string | null;
   partIndex?: number;
@@ -67,24 +73,36 @@ export interface InsertRecordingInput {
  * blocking their primary work.
  */
 export async function insertRecording(input: InsertRecordingInput): Promise<RecordingRow | null> {
-  const { data, error } = await sb
-    .from('juke_recordings')
-    .insert({
-      space_id: input.spaceId,
-      url: input.url,
-      source: input.source,
-      provider: input.provider ?? 'juke',
-      parent_id: input.parentId ?? null,
-      part_index: input.partIndex ?? 0,
-      title: input.title ?? null,
-      storage_path: input.storagePath ?? null,
-      duration_seconds: input.durationSeconds ?? null,
-      start_seconds: input.startSeconds ?? null,
-      end_seconds: input.endSeconds ?? null,
-      created_by_fid: input.createdByFid ?? 0,
-    })
-    .select('*')
-    .single();
+  const row: Record<string, unknown> = {
+    space_id: input.spaceId,
+    url: input.url,
+    source: input.source,
+    kind: input.kind ?? 'audio',
+    provider: input.provider ?? 'juke',
+    parent_id: input.parentId ?? null,
+    part_index: input.partIndex ?? 0,
+    title: input.title ?? null,
+    storage_path: input.storagePath ?? null,
+    duration_seconds: input.durationSeconds ?? null,
+    start_seconds: input.startSeconds ?? null,
+    end_seconds: input.endSeconds ?? null,
+    created_by_fid: input.createdByFid ?? 0,
+  };
+
+  let { data, error } = await sb.from('juke_recordings').insert(row).select('*').single();
+
+  // `kind` column missing = migration #5 not applied yet. Retry without it ONLY
+  // for audio (the column default) so audio uploads keep working on a partially-
+  // migrated DB. A 'video' recap must NOT silently downgrade to audio, so we let
+  // its error propagate — the recap-video route turns that into a 503 telling
+  // the caller to apply migration #5.
+  const desiredKind = input.kind ?? 'audio';
+  if (error && desiredKind === 'audio' && /column .*kind/i.test(error.message)) {
+    const withoutKind = { ...row };
+    delete withoutKind.kind;
+    ({ data, error } = await sb.from('juke_recordings').insert(withoutKind).select('*').single());
+  }
+
   if (error) {
     // 23505 = unique_violation — a retried recording.ready for a URL we already
     // stored. Treat as an idempotent no-op, not an error.

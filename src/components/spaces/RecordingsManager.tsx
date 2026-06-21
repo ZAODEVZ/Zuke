@@ -6,7 +6,8 @@ import { useRouter } from 'next/navigation';
 /** Serializable view of a juke_recordings row (mirror of RecordingRow). */
 export interface RecordingView {
   id: string;
-  source: 'juke' | 'upload' | 'snippet' | 'import';
+  source: 'juke' | 'upload' | 'snippet' | 'import' | 'recap';
+  kind: 'audio' | 'video';
   parent_id: string | null;
   title: string | null;
   url: string;
@@ -17,7 +18,7 @@ export interface RecordingView {
 
 interface RecordingsManagerProps {
   spaceId: string;
-  /** Host/admin: can upload, snippet, and export recap inputs. */
+  /** Host/admin: can upload, snippet, attach a recap video, and export inputs. */
   canManage: boolean;
   recordings: RecordingView[];
 }
@@ -27,6 +28,7 @@ const SOURCE_LABEL: Record<RecordingView['source'], string> = {
   upload: 'Upload',
   snippet: 'Snippet',
   import: 'X Space',
+  recap: 'Recap',
 };
 
 function fmtClock(totalSeconds: number): string {
@@ -82,15 +84,28 @@ export function RecordingsManager({ spaceId, canManage, recordings }: Recordings
                     ` ${fmtClock(rec.start_seconds)}–${fmtClock(rec.end_seconds)}`}
                 </span>
               </div>
-              <audio
-                controls
-                preload="none"
-                src={rec.url}
-                className="h-9 w-full [&::-webkit-media-controls-panel]:bg-[#0a1628]"
-              >
-                Your browser does not support inline audio playback.
-              </audio>
-              {canManage && rec.source !== 'snippet' && (
+              {rec.kind === 'video' ? (
+                <video
+                  controls
+                  preload="none"
+                  src={rec.url}
+                  className="w-full rounded-lg bg-black"
+                >
+                  Your browser does not support inline video playback.
+                </video>
+              ) : (
+                <audio
+                  controls
+                  preload="none"
+                  src={rec.url}
+                  className="h-9 w-full [&::-webkit-media-controls-panel]:bg-[#0a1628]"
+                >
+                  Your browser does not support inline audio playback.
+                </audio>
+              )}
+              {/* Snippets are cut from full AUDIO recordings only (not clips,
+                  not the recap video). */}
+              {canManage && rec.source !== 'snippet' && rec.kind === 'audio' && (
                 <SnippetCreator
                   parentId={rec.id}
                   maxSeconds={rec.duration_seconds}
@@ -103,6 +118,7 @@ export function RecordingsManager({ spaceId, canManage, recordings }: Recordings
       )}
 
       {canManage && <RecordingUploader spaceId={spaceId} onDone={() => router.refresh()} />}
+      {canManage && <RecapVideoAttacher spaceId={spaceId} onDone={() => router.refresh()} />}
     </section>
   );
 }
@@ -170,6 +186,120 @@ function RecordingUploader({ spaceId, onDone }: { spaceId: string; onDone: () =>
       >
         {state.status === 'uploading' ? 'Uploading…' : 'Upload'}
       </button>
+    </form>
+  );
+}
+
+/**
+ * Attach a finished recap VIDEO by URL. The juke-space-recap pipeline renders a
+ * 1080p MP4 offline (1–2 GB for a long space) which is far too big to upload
+ * through a serverless route — so the host hosts it (Supabase Storage, their
+ * own CDN, etc.) and pastes the https URL here. It lands as a kind='video'
+ * recap row and plays inline in a <video> above.
+ */
+function RecapVideoAttacher({ spaceId, onDone }: { spaceId: string; onDone: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [videoUrl, setVideoUrl] = useState('');
+  const [title, setTitle] = useState('');
+  const [state, setState] = useState<
+    { status: 'idle' } | { status: 'saving' } | { status: 'error'; message: string }
+  >({ status: 'idle' });
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="self-start text-[11px] font-semibold text-gray-400 underline underline-offset-2 hover:text-[#f5a623]"
+      >
+        Attach a recap video
+      </button>
+    );
+  }
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const url = videoUrl.trim();
+    if (!url.startsWith('https://')) {
+      setState({ status: 'error', message: 'Paste an https:// URL to the recap video' });
+      return;
+    }
+    setState({ status: 'saving' });
+    try {
+      const res = await fetch('/api/recordings/recap-video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ spaceId, videoUrl: url, title: title.trim() || undefined }),
+      });
+      const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      if (!res.ok || !body.ok) {
+        setState({ status: 'error', message: body.error ?? `Failed (${res.status})` });
+        return;
+      }
+      setState({ status: 'idle' });
+      setOpen(false);
+      setVideoUrl('');
+      setTitle('');
+      onDone();
+    } catch (err: unknown) {
+      setState({ status: 'error', message: err instanceof Error ? err.message : 'Network error' });
+    }
+  }
+
+  return (
+    <form
+      onSubmit={onSubmit}
+      className="flex flex-col gap-2 rounded-2xl border border-dashed border-[#855dcd]/30 bg-[#0d1b2a] p-4"
+    >
+      <span className="text-xs font-semibold text-gray-300">Attach a recap video</span>
+      <p className="text-[11px] leading-relaxed text-gray-500">
+        Rendered the{' '}
+        <a
+          href="https://github.com/99darwin/juke-space-recap"
+          target="_blank"
+          rel="noreferrer noopener"
+          className="text-[#a78bfa] hover:underline"
+        >
+          juke-space-recap
+        </a>{' '}
+        MP4? Host it (Supabase Storage, your CDN) and paste the https link — it plays inline here.
+      </p>
+      <input
+        type="url"
+        inputMode="url"
+        value={videoUrl}
+        onChange={(e) => setVideoUrl(e.target.value)}
+        placeholder="https://…/recap.mp4"
+        className="w-full rounded-xl border border-white/[0.08] bg-[#0a1628] px-3 py-2 text-xs text-white placeholder:text-gray-600 focus:border-[#855dcd]/50 focus:outline-none"
+      />
+      <input
+        type="text"
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        placeholder="Title (optional)"
+        maxLength={200}
+        className="w-full rounded-xl border border-white/[0.08] bg-[#0a1628] px-3 py-2 text-xs text-white placeholder:text-gray-600 focus:border-[#855dcd]/50 focus:outline-none"
+      />
+      {state.status === 'error' && <span className="text-[11px] text-red-400">{state.message}</span>}
+      <div className="flex gap-2">
+        <button
+          type="submit"
+          disabled={state.status === 'saving'}
+          className="rounded-xl border border-[#855dcd]/40 bg-[#855dcd]/10 px-4 py-1.5 text-xs font-bold text-[#a78bfa] transition-colors hover:bg-[#855dcd]/20 disabled:opacity-50"
+        >
+          {state.status === 'saving' ? 'Attaching…' : 'Attach video'}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setOpen(false);
+            setState({ status: 'idle' });
+          }}
+          className="rounded-xl border border-white/[0.12] bg-[#1a2a3a] px-4 py-1.5 text-xs font-semibold text-gray-400 hover:bg-[#22364a]"
+        >
+          Cancel
+        </button>
+      </div>
     </form>
   );
 }

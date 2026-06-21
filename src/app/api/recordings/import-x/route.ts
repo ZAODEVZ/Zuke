@@ -4,6 +4,7 @@ import { getSessionData } from '@/lib/auth/session';
 import { logger } from '@/lib/logger';
 import { insertImportedSpace } from '@/lib/spaces/jukeSpacesDb';
 import { insertRecording } from '@/lib/spaces/recordingsDb';
+import { isHttpsUrl } from '@/lib/spaces/urls';
 import { parseXSpaceUrl, X_SPACE_PROVIDER } from '@/lib/spaces/xSpaces';
 
 /**
@@ -28,12 +29,7 @@ const bodySchema = z.object({
   title: z.string().trim().min(1).max(200),
   // https-only: the URL is stored and rendered in <audio src> / <a href>;
   // restricting the scheme prevents javascript: or file: from reaching the DOM.
-  audioUrl: z
-    .string()
-    .trim()
-    .url()
-    .refine((u) => u.startsWith('https://'), { message: 'audioUrl must be an https:// URL' })
-    .optional(),
+  audioUrl: z.string().trim().refine(isHttpsUrl, { message: 'audioUrl must be an https:// URL' }).optional(),
 });
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
