@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { getSessionData } from '@/lib/auth/session';
 import { ENV } from '@/lib/env';
 import { logger } from '@/lib/logger';
-import { createJukeSpace } from '@/lib/spaces/juke-api';
+import { getLiveAudioProvider } from '@/lib/spaces/providers';
 import { insertJukeSpace } from '@/lib/spaces/jukeSpacesDb';
 
 /**
@@ -93,49 +93,46 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Juke's create-space endpoint is key-only per llms.txt; room owner is the
-  // developer app's owner_fid.
-  const apiKey = ENV.JUKE_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json(
-      {
-        success: false,
-        error:
-          'Juke developer API is not configured (missing JUKE_API_KEY). Apply at juke.audio/developers.',
-      },
-      { status: 503 },
-    );
-  }
-
   try {
-    const result = await createJukeSpace(spaceInput, { apiKey });
+    const provider = getLiveAudioProvider('juke');
+    const result = await provider.createRoom({
+      title: spaceInput.title,
+      description: spaceInput.description,
+      scheduledAt: spaceInput.scheduledAt ?? null,
+      announceCast: spaceInput.announceCast,
+      allowAgents: spaceInput.allowAgents,
+      record: spaceInput.record,
+    });
+
     if (!result.ok) {
       // Upstream Juke failure. Log the real status server-side; report a
       // single 502 to the client — a Juke 401/400 is an integration problem,
       // not a signal the ZAO caller is unauthenticated or sent a bad body.
-      logger.error('[juke/space] Juke API failed:', result.status, result.error);
+      logger.error('[juke/space] provider.createRoom failed:', result.status, result.error);
       return NextResponse.json(
         { success: false, error: result.error },
-        { status: 502 },
+        { status: result.status >= 500 ? 502 : result.status },
       );
     }
+
     // Persist the room so /live/{id} can render server-side + webhooks can
     // update its lifecycle. Best-effort: if Supabase is down we still
     // return the space id so the caller can proceed.
     try {
       await insertJukeSpace({
-        id: result.space.id,
+        id: result.room.id,
         title: spaceInput.title,
         createdByFid: session?.fid ?? 0,
         scheduledAt: spaceInput.scheduledAt ?? null,
-        embedUrl: result.space.embedUrl,
-        raw: result.space.raw,
+        embedUrl: result.room.embedUrl,
+        raw: result.room.raw,
       });
     } catch (dbErr: unknown) {
       logger.error('[juke/space] insertJukeSpace failed (non-fatal):', dbErr);
     }
+
     return NextResponse.json(
-      { success: true, data: result.space },
+      { success: true, data: result.room },
       { status: 201 },
     );
   } catch (error: unknown) {

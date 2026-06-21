@@ -124,6 +124,35 @@ export async function getRecording(id: string): Promise<RecordingRow | null> {
   return (data as RecordingRow | null) ?? null;
 }
 
+/**
+ * Distinct space IDs that have at least one non-snippet recording in
+ * juke_recordings, ordered by most-recently created. Powers the recordings
+ * shelf so upload-only and X-import spaces appear alongside juke auto-recordings.
+ * Falls back to [] when the table is missing (migration #4 not applied yet).
+ */
+export async function listRecentRecordedSpaceIds(limit = 25): Promise<string[]> {
+  const { data, error } = await sb
+    .from('juke_recordings')
+    .select('space_id, created_at')
+    .neq('source', 'snippet')
+    .order('created_at', { ascending: false })
+    .limit(limit * 4); // over-fetch to account for dupes
+  if (error) {
+    if (isMissingTable(error.message)) return [];
+    throw new Error(`listRecentRecordedSpaceIds failed: ${error.message}`);
+  }
+  const seen = new Set<string>();
+  const ids: string[] = [];
+  for (const row of (data ?? []) as Array<{ space_id: string }>) {
+    if (!seen.has(row.space_id)) {
+      seen.add(row.space_id);
+      ids.push(row.space_id);
+      if (ids.length >= limit) break;
+    }
+  }
+  return ids;
+}
+
 /** Count recordings already attached to a space — used to assign part_index. */
 export async function countRecordingsForSpace(spaceId: string): Promise<number> {
   const { count, error } = await sb
