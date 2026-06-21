@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getSessionData } from '@/lib/auth/session';
-import { ENV } from '@/lib/env';
 import { logger } from '@/lib/logger';
 import { isValidJukeSpaceId } from '@/lib/spaces/juke';
+import { getLiveAudioProvider } from '@/lib/spaces/providers';
 import { getJukeSpace, updateJukeSpace } from '@/lib/spaces/jukeSpacesDb';
 
 /**
@@ -31,11 +31,10 @@ import { getJukeSpace, updateJukeSpace } from '@/lib/spaces/jukeSpacesDb';
  *
  * Body: { spaceId }
  * Returns:
- *   200 { ok: true, spaceId, juke: { status: 'ended' } }
+ *   200 { ok: true, spaceId, provider, raw }
  *   202 { ok: true, spaceId, fallback: 'mark-ended' } when Juke 404s the
  *       endpoint (i.e. they have not shipped PR #174 yet) - in that case the
  *       caller should follow up with mark-ended for an interim manual flip.
- *   503 { ok: false, error: 'JUKE_API_KEY not configured' }
  */
 
 const BodySchema = z.object({
@@ -46,14 +45,6 @@ export async function POST(request: NextRequest) {
   const session = await getSessionData();
   if (!session?.fid) {
     return NextResponse.json({ ok: false, error: 'Sign in required' }, { status: 401 });
-  }
-
-  const apiKey = ENV.JUKE_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json(
-      { ok: false, error: 'JUKE_API_KEY not configured on the server' },
-      { status: 503 },
-    );
   }
 
   let raw: unknown;
@@ -89,81 +80,53 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, spaceId, alreadyEnded: true });
   }
 
-  const endpoint = `https://api.juke.audio/v1/developer/spaces/${encodeURIComponent(spaceId)}/end`;
-  let res: Response;
-  try {
-    res = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'X-Juke-Api-Key': apiKey,
-        'Content-Type': 'application/json',
-      },
-      signal: AbortSignal.timeout(10_000),
-    });
-  } catch (err: unknown) {
-    logger.error('[juke/admin/end-space] fetch failed', err);
-    return NextResponse.json(
-      { ok: false, error: 'Juke end-space API unreachable' },
-      { status: 502 },
-    );
-  }
+  // Dispatch end-room to whichever backend owns this space. Defaults to
+  // 'juke' for rows written before migration #3 added the provider column.
+  const provider = getLiveAudioProvider(row.provider ?? 'juke');
+  const result = await provider.endRoom(spaceId);
 
-  const text = await res.text();
-  let jukeBody: unknown;
-  try {
-    jukeBody = JSON.parse(text);
-  } catch {
-    jukeBody = text;
-  }
-
-  // 404 = Juke has not shipped PR #174 yet, OR cross-app / iOS-native room.
-  // Same shape from Juke's side - no enumeration oracle. We flip our DB to
-  // ended as a graceful fallback so /spaces stops showing the row as Live;
-  // when room.finished eventually arrives from a later natural end, the
-  // handler is idempotent + a no-op.
-  if (res.status === 404) {
-    logger.warn(
-      '[juke/admin/end-space] Juke 404 - end-space endpoint not yet shipped or cross-app room',
-      { spaceId },
-    );
-    try {
-      await updateJukeSpace(spaceId, {
-        status: 'ended',
-        ended_at: new Date().toISOString(),
-      });
-    } catch (err: unknown) {
-      logger.error('[juke/admin/end-space] fallback mark-ended DB update failed', err);
+  if (!result.ok) {
+    // Juke-specific fallback: 404 = Juke's end-space endpoint not yet shipped
+    // (PR #174) or a cross-app / iOS-native room. Flip our DB to ended so the
+    // listing stops showing it as Live; a natural room.finished may still arrive.
+    if ((row.provider ?? 'juke') === 'juke' && result.status === 404) {
+      logger.warn(
+        '[juke/admin/end-space] Juke 404 - end-space endpoint not yet shipped or cross-app room',
+        { spaceId },
+      );
+      try {
+        await updateJukeSpace(spaceId, {
+          status: 'ended',
+          ended_at: new Date().toISOString(),
+        });
+      } catch (err: unknown) {
+        logger.error('[juke/admin/end-space] fallback mark-ended DB update failed', err);
+        return NextResponse.json(
+          { ok: false, error: 'Juke end-space 404 + local fallback failed' },
+          { status: 502 },
+        );
+      }
       return NextResponse.json(
-        { ok: false, error: 'Juke end-space 404 + local fallback failed' },
-        { status: 502 },
+        {
+          ok: true,
+          spaceId,
+          fallback: 'mark-ended',
+          note: 'Juke end-space endpoint not yet available; flipped local status to ended. A real room.finished may still arrive later.',
+        },
+        { status: 202 },
       );
     }
+    logger.warn('[juke/admin/end-space] provider rejected', result.status, result.error);
     return NextResponse.json(
-      {
-        ok: true,
-        spaceId,
-        fallback: 'mark-ended',
-        note: 'Juke end-space endpoint not yet available; flipped local status to ended. A real room.finished may still arrive later.',
-      },
-      { status: 202 },
+      { ok: false, error: result.error ?? `Provider returned ${result.status}` },
+      { status: result.status >= 500 ? 502 : result.status },
     );
   }
 
-  if (!res.ok) {
-    logger.warn('[juke/admin/end-space] Juke rejected', res.status, jukeBody);
-    return NextResponse.json(
-      { ok: false, error: `Juke returned ${res.status}`, juke: jukeBody },
-      { status: res.status >= 500 ? 502 : res.status },
-    );
-  }
-
-  // Success path: Juke accepted. We do NOT flip our DB here - the inbound
-  // room.finished webhook will arrive almost immediately (Nicky confirmed
-  // synchronous dispatch in same PR #174) and the handler will update the row
-  // with the canonical ended_at + ended_via payload. Keeping all lifecycle
-  // updates in the webhook handler means natural ends and API ends share the
-  // same code path, fewer divergence bugs.
-  return NextResponse.json({ ok: true, spaceId, juke: jukeBody });
+  // Success path: provider accepted. We do NOT flip our DB here — the inbound
+  // room.finished webhook (ended_via: "api") is the source of truth for the
+  // lifecycle update, keeping natural ends and API ends on the same code path.
+  return NextResponse.json({ ok: true, spaceId, provider: provider.provider, raw: result.raw });
 }
 
 export const GET = () =>

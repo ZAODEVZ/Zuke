@@ -12,7 +12,12 @@ Follow these steps to provision and deploy Zuke.
 npx tsx scripts/register-juke-webhook.ts  # If needed
 psql -U postgres -d zuke_db -f scripts/juke-spaces-migration.sql
 psql -U postgres -d zuke_db -f scripts/juke-spaces-migration-2.sql
+psql -U postgres -d zuke_db -f scripts/juke-spaces-migration-3.sql
+psql -U postgres -d zuke_db -f scripts/juke-spaces-migration-4.sql
 ```
+
+Migration #4 adds multi-part recordings + the public `recordings` storage
+bucket. See `docs/recap.md` for the recordings / snippets / recap-video flow.
 
 ## Step 2 - Juke API Key
 
@@ -30,6 +35,7 @@ SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key>
 JUKE_API_KEY=<your-juke-api-key>
 JUKE_WEBHOOK_SECRET=<your-juke-webhook-secret>
 ZUKE_ADMIN_PASSWORD=<a-secure-password-for-v0>
+NEYNAR_API_KEY=<optional-for-recap-pfp-enrichment>
 ```
 
 ## Step 4 - Register Webhook

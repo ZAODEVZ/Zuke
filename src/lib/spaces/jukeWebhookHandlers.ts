@@ -27,6 +27,8 @@ import {
   updateJukeSpace,
   type JukeParticipantEntry,
 } from './jukeSpacesDb';
+import { countRecordingsForSpace, insertRecording } from './recordingsDb';
+import { readRecordingParts } from './recordingParts';
 
 interface JukeWebhookBody {
   // Juke 2026-05-23 shape uses snake_case `event_type` + `event_id` at top level
@@ -90,20 +92,6 @@ export function parseWebhookEvent(body: unknown): ParsedWebhookEvent {
       : null) ??
     null;
   return { eventType, spaceId, eventId };
-}
-
-/** Pull the recording url from any reasonable place in the body. */
-function readRecordingUrl(body: unknown): string | null {
-  const b = (body ?? {}) as JukeWebhookBody;
-  if (typeof b.recording_url === 'string') return b.recording_url;
-  if (typeof b.recordingUrl === 'string') return b.recordingUrl;
-  if (b.data && typeof b.data === 'object') {
-    const d = b.data as { recording_url?: string; recordingUrl?: string; url?: string };
-    if (typeof d.recording_url === 'string') return d.recording_url;
-    if (typeof d.recordingUrl === 'string') return d.recordingUrl;
-    if (typeof d.url === 'string') return d.url;
-  }
-  return null;
 }
 
 function readOccurredAt(body: unknown): string {
@@ -256,9 +244,39 @@ export async function applyWebhookEvent(
       return;
     }
     case 'recording.ready': {
-      const url = readRecordingUrl(body);
-      if (!url) return;
-      await updateJukeSpace(spaceId, { recording_url: url });
+      // Juke ships multi-part recordings, so a single delivery may carry
+      // several parts. Persist every part as a juke_recordings row (idempotent
+      // on the space_id+url unique index) and keep the legacy single
+      // recording_url pointed at the FIRST part for back-compat.
+      const parts = readRecordingParts(body);
+      if (parts.length === 0) return;
+      await updateJukeSpace(spaceId, { recording_url: parts[0].url });
+
+      // part_index continues from whatever is already attached so a later
+      // delivery (another part) appends rather than colliding.
+      let nextIndex = 0;
+      try {
+        nextIndex = await countRecordingsForSpace(spaceId);
+      } catch (err: unknown) {
+        logger.warn('[juke/webhooks] countRecordingsForSpace failed (non-fatal):', err);
+      }
+      for (let i = 0; i < parts.length; i++) {
+        const part = parts[i];
+        try {
+          await insertRecording({
+            spaceId,
+            url: part.url,
+            source: 'juke',
+            provider: 'juke',
+            partIndex: nextIndex + i,
+            title: part.title ?? (parts.length > 1 ? `Part ${nextIndex + i + 1}` : null),
+            durationSeconds: part.durationSeconds,
+          });
+        } catch (err: unknown) {
+          logger.warn('[juke/webhooks] insertRecording failed (non-fatal):', err);
+        }
+      }
+
       // Best-effort recap cast - autoCastToZao silently no-ops if the
       // @thezao signer is not configured, so this is safe on local + preview.
       try {
