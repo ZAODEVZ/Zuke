@@ -22,6 +22,10 @@ type Status = 'idle' | 'creating' | 'done' | 'error';
 export default function CreateLiveSpacePage() {
   const [password, setPassword] = useState('');
   const [title, setTitle] = useState('');
+  // Default ON: recording is what powers the post-live archive + the recap
+  // video pipeline. Juke's own API defaults record to false, so we must send
+  // this explicitly or the space produces nothing to recap.
+  const [record, setRecord] = useState(true);
   const [status, setStatus] = useState<Status>('idle');
   const [error, setError] = useState<string | null>(null);
   const [space, setSpace] = useState<CreatedSpace | null>(null);
@@ -38,7 +42,7 @@ export default function CreateLiveSpacePage() {
       const res = await fetch('/api/juke/space', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: title.trim(), password }),
+        body: JSON.stringify({ title: title.trim(), password, record }),
       });
       const body = await res.json();
       if (!res.ok || !body.success) {
@@ -172,6 +176,26 @@ export default function CreateLiveSpacePage() {
                   }}
                   className="mt-1.5 w-full rounded-xl border border-white/[0.08] bg-[#0d1b2a] px-4 py-3 text-sm text-white placeholder:text-gray-600 focus:border-[#f5a623]/50 focus:outline-none"
                 />
+
+                <label
+                  htmlFor="create-record"
+                  className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-white/[0.08] bg-[#0d1b2a] p-3"
+                >
+                  <input
+                    id="create-record"
+                    type="checkbox"
+                    checked={record}
+                    onChange={(e) => setRecord(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 flex-shrink-0 accent-[#f5a623]"
+                  />
+                  <span className="text-xs text-gray-300">
+                    Record this space
+                    <span className="mt-0.5 block text-[11px] text-gray-500">
+                      Saves a recording when it ends — the source for snippets and recap videos.
+                      Leave on unless it&apos;s a private call.
+                    </span>
+                  </span>
+                </label>
 
                 {error && <p className="mt-3 text-xs text-red-400">{error}</p>}
 
