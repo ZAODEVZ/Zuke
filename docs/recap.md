@@ -43,16 +43,40 @@ stores the parent recording's URL plus `start_seconds` / `end_seconds`, and the
 player streams it with a media-fragment URL — `…/recording.ogg#t=12,48` — so the
 browser seeks the original file to the clip window. Instant and exact.
 
-## The recap video pipeline (offline)
+## Two render paths
+
+Both run **offline**. A serverless function cannot run a multi-hour render, and
+there is no ffmpeg in serverless, so Zuke's job in both cases is the same: hand
+the pipeline the inputs it cannot easily get on its own — the space audio plus
+the Farcaster identities of everyone who joined. Zuke itself renders nothing.
+
+| Want | Use | Cost |
+| --- | --- | --- |
+| A YouTube upload (1080p mp4 + captions + title/description/chapters/tags) | [`bettercallzaal/ZAOVideoEditor`](https://github.com/bettercallzaal/ZAOVideoEditor) | minutes |
+| A recap video with per-guest PFPs | [`99darwin/juke-space-recap`](https://github.com/99darwin/juke-space-recap) | 3–6 hours |
+
+### YouTube (ZAOVideoEditor)
+
+A space has no video track, so ZAOVideoEditor renders an *audiogram* — a branded
+1920×1080 card plus a live waveform, muxed with the audio — then transcribes it
+and writes the YouTube metadata beside the mp4. One command, straight off a
+space id:
+
+```bash
+python scripts/space_to_youtube.py --space-id {id} --zuke-base https://zuke.thezao.com
+```
+
+It reads the same `/api/recordings/recap` payload documented below, so no Zuke
+changes were needed. Captions ship as an `.srt` sidecar, which YouTube ingests
+natively. Nothing is uploaded automatically.
+
+### Per-guest PFP recap (Remotion)
 
 [`99darwin/juke-space-recap`](https://github.com/99darwin/juke-space-recap) is a
 Remotion pipeline that turns a long space recording into a 1920×1080 recap video
-with per-guest PFPs, rolling captions, and a waveform. It runs **offline**
-(Deepgram transcription + a 3–6 hour Remotion render) and is **not** part of the
-Zuke web app — a serverless function cannot run a multi-hour render.
-
-Zuke's job is to hand that pipeline the inputs it can't easily get on its own:
-the space audio plus the Farcaster identities of everyone who joined.
+with per-guest PFPs, rolling captions, and a waveform. It uses Deepgram
+transcription and a 3–6 hour Remotion render, and has a human-in-the-loop step
+for matching spoken names to `@handles`.
 
 ### Export recap inputs
 
@@ -77,7 +101,19 @@ than failing — the audio export still works.
 On the space page, the **Recap inputs** button downloads this as
 `recap-inputs-{spaceId}.json`.
 
-### Running the render
+### Running the YouTube render
+
+Clone `bettercallzaal/ZAOVideoEditor`, then point it at the space id — it fetches
+the audio and metadata from the recap endpoint itself:
+
+```bash
+python scripts/space_to_youtube.py --space-id {id} --minutes 3   # smoke render first
+python scripts/space_to_youtube.py --space-id {id} --quality best
+```
+
+Outputs `<slug>.mp4`, `<slug>.srt`, and `<slug>.youtube.txt`. Upload is manual.
+
+### Running the PFP recap render
 
 1. Download a recording (the `audio[]` URLs above).
 2. Clone `99darwin/juke-space-recap`, `npm install`, set `DEEPGRAM_API_KEY` /
