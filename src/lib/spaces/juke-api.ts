@@ -50,8 +50,11 @@ export interface CreateJukeSpaceInput {
    * When true, Juke records the room. The recording.ready webhook fires when
    * the file lands and `recording_url` populates on the juke_spaces row, which
    * also drives the auto "Recording up" cast + /live/recordings shelf.
-   * Default OFF on Juke's side per llms.txt; ZAO defaults this ON in the UI
-   * because the recording is what powers the post-live discovery loop.
+   * Defaults to false (both on Juke's side and this function's own `?? false`
+   * fallback) when the caller omits it. The real `/live/create` form never
+   * sends this field, so spaces created through it are unrecorded by default;
+   * only the admin test console (`AdminConsole.tsx`) defaults its own local
+   * state to `true`. Same category of gap as `allowAgents` below.
    */
   record?: boolean;
   /** Optional space description shown inside the Juke embed. */

@@ -51,7 +51,9 @@ const createSpaceSchema = z.object({
   /**
    * When true, Juke records the room. recording.ready webhook lands when the
    * file is ready and drives the /live/recordings shelf + "Recording up" cast.
-   * ZAO default is true so every space contributes to the archive.
+   * Optional, defaults to false when omitted (see createJukeSpace) - the real
+   * /live/create form never sends this field, so every space created through
+   * it is unrecorded unless AdminConsole's own local `true` default is used.
    */
   record: z.boolean().optional(),
   /** Space description shown inside the Juke embed. */
