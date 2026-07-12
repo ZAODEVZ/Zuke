@@ -33,8 +33,9 @@ import { getJukeSpace, updateJukeSpace } from '@/lib/spaces/jukeSpacesDb';
  * Returns:
  *   200 { ok: true, spaceId, provider, raw }
  *   202 { ok: true, spaceId, fallback: 'mark-ended' } when Juke 404s the
- *       endpoint (i.e. they have not shipped PR #174 yet) - in that case the
- *       caller should follow up with mark-ended for an interim manual flip.
+ *       endpoint - this endpoint has shipped since PR #174, so a 404 here
+ *       means a cross-app / iOS-native room we don't own, not a missing
+ *       endpoint. We flip our DB status locally as an interim manual fix.
  */
 
 const BodySchema = z.object({
@@ -86,12 +87,13 @@ export async function POST(request: NextRequest) {
   const result = await provider.endRoom(spaceId);
 
   if (!result.ok) {
-    // Juke-specific fallback: 404 = Juke's end-space endpoint not yet shipped
-    // (PR #174) or a cross-app / iOS-native room. Flip our DB to ended so the
-    // listing stops showing it as Live; a natural room.finished may still arrive.
+    // Juke-specific fallback: 404 = a cross-app / iOS-native room we don't own
+    // (the end-space endpoint itself has shipped since PR #174). Flip our DB
+    // to ended so the listing stops showing it as Live; a natural
+    // room.finished may still arrive.
     if ((row.provider ?? 'juke') === 'juke' && result.status === 404) {
       logger.warn(
-        '[juke/admin/end-space] Juke 404 - end-space endpoint not yet shipped or cross-app room',
+        '[juke/admin/end-space] Juke 404 - cross-app / iOS-native room we do not own',
         { spaceId },
       );
       try {
@@ -111,7 +113,7 @@ export async function POST(request: NextRequest) {
           ok: true,
           spaceId,
           fallback: 'mark-ended',
-          note: 'Juke end-space endpoint not yet available; flipped local status to ended. A real room.finished may still arrive later.',
+          note: 'Juke returned 404 for this room (cross-app / iOS-native, not one we own); flipped local status to ended. A real room.finished may still arrive later.',
         },
         { status: 202 },
       );

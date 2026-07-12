@@ -67,7 +67,7 @@ export function EndJukeSpaceButton({ spaceId }: EndJukeSpaceButtonProps) {
   if (state.status === 'ended') {
     return (
       <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2.5 text-xs font-semibold text-emerald-300">
-        Space ended{state.via === 'fallback' ? ' (local-only - Juke endpoint not shipped yet)' : ''}
+        Space ended{state.via === 'fallback' ? ' (local-only - cross-app room, Juke has no record of it)' : ''}
       </div>
     );
   }
