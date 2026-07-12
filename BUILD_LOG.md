@@ -2767,3 +2767,139 @@ codebase - same three as every prior run)
   unused code - same note as Runs 8-18, still a product/scope call.
 - `zukeConfig.brandColor` is still defined with zero consumers - same note
   as Runs 10-18, flagged in case future branding work wants it.
+
+## Run 20 — 2026-07-12
+
+Read this file fully before starting. Local checkout was HEAD-detached at
+Run 19's last commit (`219e7f8`), already equal to `origin/main` (0 commits
+behind) - same recurring pattern as every prior run. Checked out a tracking
+`main` branch pointed at it. Re-verified from a clean `npm install`
+(removed `node_modules` first): `build`, `lint`, `typecheck`, `test`
+(94/94) all pass clean before touching anything.
+
+### Task A - still correctly ruled out (Run 1). Not re-investigated this
+run; nothing prompted a re-check.
+
+### Task C - lightweight re-check per Run 19's recommendation (targeted
+grep/read of each item's key signal, not a full sub-agent dispatch); zero
+drift on all 4 items, tenth consecutive stable run (10-19, now 20)
+
+1. **Item 1 (SIWN)** - `ZUKE_ADMIN_PASSWORD` still only referenced in
+   `session.ts:48-53`'s explicitly opt-in legacy fallback block and
+   `env.ts`'s declaration. No change.
+2. **Item 2 (signer)** - `auto-cast.ts` still the unconditional stub
+   (logs, returns `null`). Still blocked on a @thezao Farcaster signer
+   credential this sandbox cannot provision or fake. No change.
+3. **Item 3 (custom domain)** - zero `zaoos.com` hits and zero non-test
+   `localhost` hits anywhere in `src/`. Remains verified-done.
+4. **Item 4 (branding)** - `public/` still only the five unmodified
+   create-next-app SVGs; `favicon.ico` md5 still
+   `c30c7d42707a47a3f4591831641e50dc`, byte-identical to every prior run's
+   check. Still the one documented gap needing a human-provided design
+   asset.
+
+`setup-zuke.md`'s roadmap section (README no longer carries one, per Run
+6) independently re-read and still correctly lists only items 2 and 4,
+with the shipped-domain note intact - matches all of the above exactly.
+
+### Fallback Task B sweep - dispatched one Explore sub-agent into fresh
+territory (`docs/recap.md` full re-read, `jukeChangelog.ts`,
+`jukeAgentJoin.ts` + its route, X Spaces import feature end-to-end,
+`recordingParts.ts` - the first two had been touched before but not
+closely; the X-import feature had never been individually audited).
+Two real, verified findings; both fixed
+
+1. **`recording.ready` webhook handler could clobber `juke_spaces
+   .recording_url` with a later delivery's first part instead of the
+   space's true first part.** Verified directly in
+   `jukeWebhookHandlers.ts:246-263`: the handler unconditionally set
+   `recording_url: parts[0].url` from *that delivery's* parts array on
+   every `recording.ready` event, before computing `nextIndex` (the
+   count of recordings already attached to the space via
+   `countRecordingsForSpace`). For a space that receives more than one
+   `recording.ready` delivery (a second part landing later), the second
+   delivery's `parts[0]` is not the space's overall first part, but the
+   code overwrote `recording_url` with it anyway - directly contradicting
+   the handler's own comment ("keep the legacy single recording_url
+   pointed at the FIRST part for back-compat") and `docs/recap.md:36`'s
+   matching claim. Fixed by moving the `nextIndex` computation before the
+   write and gating the write on `nextIndex === 0` (i.e. only when this
+   delivery contains the space's actual first-ever attached part).
+   `docs/recap.md:36`'s claim is now true as written, so no doc edit was
+   needed there - only the code had drifted from the documented intent.
+   `jukeIntegrationManifest.ts:401`'s matching one-line summary
+   ("recording.ready -> juke_spaces.recording_url (first part,
+   back-compat)") also re-checked and needed no change - it now
+   accurately describes the fixed behavior. No test added: exercising
+   this properly needs mocking the Supabase query-builder chain that
+   `jukeSpacesDb.ts`/`recordingsDb.ts` call directly
+   (`supabaseAdmin as any`), and no test in this repo currently mocks
+   Supabase at all - a new mocking harness for one regression is a
+   bigger lift than this run's scope; flagging for a future run instead
+   of inventing infra ad hoc. Commit `252f786`.
+2. **`import-x/route.ts:23`'s docstring claimed its auth gate was
+   "creation-gated like `/live/create`".** Verified directly:
+   `/live/create`'s real backing route (`POST /api/juke/space`,
+   `route.ts:86-93`) requires an admin session OR a `password` matching
+   `JUKE_CREATE_PASSWORD`. `import-x/route.ts:40-43` requires only
+   `session?.fid || session?.isAdmin` - any signed-in ZAO user, not
+   password/admin-gated at all. Materially different, more permissive
+   gate. Corrected the comment to describe the actual gate rather than
+   changing the auth logic itself (no evidence either way on which gate
+   is *intended* - a product call, not something to invent) and noted
+   the plausible reason for the difference (importing a past recording
+   carries no live-room cost/abuse surface). Commit `f586b55`.
+
+The sub-agent's other three checked areas (`jukeChangelog.ts`,
+`jukeAgentJoin.ts` + its route/manifest entry, `recordingParts.ts`) came
+back clean on independent verification - no false claims found.
+
+All of build, lint, typecheck, and test (94/94) pass clean as of the last
+commit this run. Pushed both commits to `origin/main`.
+
+### Explicitly not touched (confirmed blocked on someone outside this
+codebase - same three as every prior run)
+
+- `JUKE_USER_TOKEN` refresh flow
+- Recurring-event cron
+- Agent-in-Juke/ZOE auto-join (specifically the *unattended*/auto-join
+  piece - unchanged since Run 13, still blocked on both the VPS-side
+  session-token consumer and `allow_agents` not being exposed on the real
+  create path, per Run 16)
+
+### For the next run
+
+- All 4 roadmap items remain in the same state Runs 10-19 left them: items
+  1 and 3 done, item 2 blocked on a @thezao Farcaster signer credential,
+  item 4's code-side gap fixed with the logo/favicon design asset itself
+  still the one open piece. Tenth consecutive stable run - the
+  lighter-weight re-check (not a full sub-agent dispatch per item) held
+  up fine and is a reasonable continuing default.
+- `jukeIntegrationManifest.ts`'s dedicated close-read sub-agent is still
+  correctly paused per Run 17's recommendation - resume it only if a
+  future commit touches webhook handlers, the provider registry,
+  create-space fields, or admin routes. This run's fix *did* touch a
+  webhook handler, so a targeted grep-check of the manifest's
+  `recording.ready`/`recording_url` claims was done inline above (not the
+  full close-read) - still held up, no change needed.
+- This repo has no Supabase-mocking test infrastructure at all
+  (`jukeSpacesDb.ts`/`recordingsDb.ts` both cast `supabaseAdmin as any`
+  and every existing test only covers pure functions). If a future run
+  wants real regression coverage for webhook-handler DB side effects
+  (like this run's `recording_url` bug), that infra would need to be
+  built first - worth a dedicated run if webhook-handler correctness
+  keeps surfacing real bugs.
+- `import-x/route.ts`'s auth gate (any signed-in user) vs. `/live/create`'s
+  (admin or shared password) being intentionally different is still an
+  assumption, not a confirmed product decision - flagging in case a human
+  wants them aligned.
+- The two adjacent product questions from Run 16/17 (`allowAgents`
+  default, `record` default on `/live/create`) still need a human
+  decision, not invented code - unchanged this run.
+- `getSupabaseBrowser` (`src/lib/db/supabase.ts`) is still real, working,
+  unused code - same note as Runs 8-19, still a product/scope call.
+- `zukeConfig.brandColor` is still defined with zero consumers - same note
+  as Runs 10-19, flagged in case future branding work wants it.
+- `NEYNAR_API_KEY` consumer inconsistency (`verify/route.ts` reads
+  `process.env` directly instead of via `ENV`) flagged in Run 19 remains
+  unfixed - not a false claim, just a normalization opportunity.
