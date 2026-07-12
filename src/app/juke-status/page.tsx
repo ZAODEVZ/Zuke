@@ -226,7 +226,7 @@ function WebhookTimelineSection({ events }: { events: RecentWebhookEventRow[] })
         <div className="bg-[#111d2e] border border-white/[0.08] rounded-xl p-4 text-xs text-gray-500">
           No webhook deliveries yet. Confirm the subscription via{' '}
           <code className="text-gray-300">POST /api/juke/admin/register-webhook</code>; once Juke
-          starts posting, the most recent 15 events show up here.
+          starts posting, the most recent 8 events show up here.
         </div>
       ) : (
         <ul className="bg-[#111d2e] border border-white/[0.08] rounded-xl divide-y divide-white/[0.04]">

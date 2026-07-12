@@ -154,7 +154,9 @@ export async function getJukeSpace(id: string): Promise<JukeSpaceRow | null> {
 
 /** List the N most-recently-touched juke_spaces rows regardless of status.
  * Powers the "Recent spaces" table on /juke-status so Nicky's agent can see
- * real usage at a glance. Returns title, status, and time markers only. */
+ * real usage at a glance. Returns title, status, time markers, plus
+ * participant_count and recording_url for the listener-count/recording-link
+ * badges that section renders. */
 export interface RecentJukeSpaceRow {
   id: string;
   title: string;
