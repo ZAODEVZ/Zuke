@@ -1092,3 +1092,181 @@ codebase - same three as every prior run)
   it's fair to conclude this repo's Task-B backlog is genuinely close to
   exhausted - though Run 8's and this run's findings both came from files
   every prior run had already "finished," so don't assume without checking.
+
+## Run 10 — 2026-07-12
+
+Read this file fully before starting. Local `main` had detached again (same
+recurring pattern as every prior run) - fast-forwarded to `origin/main` (2
+commits). Re-verified from a clean `npm install`: `build`, `lint`,
+`typecheck`, `test` (94/94) all pass clean before touching anything.
+
+Scope changed this run per the human owner: Task A stays ruled out (Run 1),
+but the general Task B sweep now takes a back seat to a new **Task C** -
+auditing `README.md`'s (moved to `setup-zuke.md`'s) "v1 Roadmap" against
+actual code, item by item, verify-don't-assume.
+
+### Task C, item 1 - "Replace admin password with Farcaster SIWN"
+
+Already correctly identified as done and removed from the roadmap by Run 2
+(commit `36179ff`) - this item no longer even appears in `setup-zuke.md`'s
+current "v1 Roadmap" (only 3 items remain: signer, domain, branding).
+Re-verified anyway, from scratch, that the gate is genuinely complete and
+not partially wired: read `src/lib/auth/session.ts` end-to-end and grepped
+every consumer of `isAdmin`/`getSessionData`/`ZUKE_ADMIN_PASSWORD`. Every
+admin-gated route (`agent-join`, `delete-webhook`, `end-space`,
+`mark-ended`, `register-webhook`, `partner-token`, `/api/juke/space`,
+`/admin`, `/admin/login`) checks `getSessionData().isAdmin`, which resolves
+via SIWF + the `ZUKE_ADMIN_FIDS` allowlist by default. The legacy
+`zuke_admin` password cookie only activates at all if `ZUKE_ADMIN_PASSWORD`
+is explicitly set (empty/unset by default) - it's an opt-in back-compat
+fallback, not a parallel gate silently open in production, and is already
+correctly documented as such. Also confirmed `JUKE_CREATE_PASSWORD` (the
+password `/live/create` actually uses) is a distinct, intentional
+shared-secret feature for non-admin team members to spin up rooms - not
+the same mechanism as the deprecated admin password, and not something the
+roadmap item was ever about. **Nothing to fix - already fully wired,
+correctly documented, and already reflected in the roadmap by a prior
+run.**
+
+### Task C, item 2 - "Integrate ZAO signer for auto-casting to @thezao"
+
+Re-read `src/lib/publish/auto-cast.ts`: still an unconditional stub (logs,
+returns `null`, no conditional logic). Grepped for "signer" repo-wide -
+zero references to any actual signer credential anywhere in code, env
+vars, or docs; `README.md`'s Architecture section and both
+`jukeIntegrationManifest.ts` SHIPPED entries that reference it already
+honestly caveat this ("wiring shipped, posting not yet live"), consistent
+with every prior run's finding. **Confirmed still blocked** on a
+@thezao Farcaster signer credential this sandbox has no access to
+provision or fake - same category as the three explicitly-excluded items.
+Nothing to fix; nothing to build without a real credential.
+
+### Task C, item 3 - "Custom domain: zuke.thezao.com"
+
+Independently verified live by the human owner tonight (200 in prod).
+Read `src/zuke.config.ts`'s `getBaseUrl()` and every consumer
+(`jukeWebhookHandlers.ts`, `admin/register-webhook/route.ts`), plus
+`AuthKitWrapper.tsx`'s SSR domain fallback, `jukeIntegrationManifest.ts`'s
+hardcoded URLs, and `juke-status/page.tsx`'s reference snippet - all
+already consistently target `zuke.thezao.com`. No leftover `zaoos.com` or
+stray `localhost` references found in a repo-wide grep (`zaoos.com` only
+appears in this log's own Run 1 history entry, describing an old bug
+already fixed). Found and fixed two real, narrow gaps:
+
+1. `zuke.config.ts`'s doc comment still said code needed to agree on the
+   canonical host "even before the custom domain (zuke.thezao.com) lands"
+   - stale now that it's live. Reworded to state the domain is live and
+   explain `NEXT_PUBLIC_SITE_URL`'s role as an explicit pin.
+2. `NEXT_PUBLIC_SITE_URL` - the #1, highest-priority entry in
+   `getBaseUrl()`'s own resolution-order comment, and the one code-level
+   lever a deployer has to pin the base URL regardless of how Vercel's
+   `VERCEL_PROJECT_PRODUCTION_URL` resolves a custom-domain alias - was
+   undocumented in `setup-zuke.md`'s env var list (the "full list" this
+   project's docs have promised since Run 6). Added it with an
+   explanation of what it does and when it's actually needed.
+
+No DNS/Vercel dashboard access exists from this sandbox to verify domain
+config directly, per the task framing - this was a pure code-consistency
+check. **Verified done code-side**; marking this roadmap item as
+verified-complete rather than inventing further work on it. Commit
+`a434aa7`.
+
+### Task C, item 4 - "Branding: Zuke identity + logo"
+
+Checked `public/` - it contains only the five unmodified create-next-app
+default SVGs (`next.svg`, `vercel.svg`, `window.svg`, `globe.svg`,
+`file.svg`), none referenced anywhere in `src` (confirmed via grep - dead
+scaffold files). `src/app/favicon.ico` is also confirmed to be the
+stock Next.js default (25,931 bytes, 4 icon sizes, matches the known
+create-next-app default exactly) - **no real Zuke logo or favicon asset
+exists anywhere in this repo.** This is a genuine design-asset gap I
+cannot invent from nothing (no design input, and fabricating a placeholder
+logo and calling it "done" would be worse than leaving it honestly
+missing) - documenting it here rather than faking it, same as every prior
+run's treatment of the three explicitly-blocked items.
+
+While checking for stale "ZAO"-not-"Zuke" product surfaces (commit
+`4d9bfac`'s rebrand, per the task's own framing), found something more
+basic than a rebrand miss: **`src/app/layout.tsx`'s root metadata was
+still the literal, unmodified create-next-app boilerplate** -
+`title: "Create Next App"`, `description: "Generated by create next app"`
+- never touched since project scaffolding. Three routes have no
+page-level metadata to override it: `/admin`, `/admin/login`, and
+`/live/create` (a `'use client'` page, which can't export `metadata`
+itself). In production, all three routes' browser tabs and any link
+previews showed the raw Next.js scaffold title, not even a stale "ZAO"
+string - the actual create-next-app default. Fixed:
+
+- `src/app/layout.tsx` - real Zuke title/description matching the
+  established `zukeConfig.name` pattern used by every other page in the
+  app.
+- `src/app/admin/page.tsx` and `src/app/admin/login/page.tsx` - added
+  page-level `metadata` (both are server components, so this was a direct
+  export), `robots: { index: false }` matching the existing pattern for
+  utility pages (`/live/import`, `/live/recordings`).
+- `src/app/live/create/layout.tsx` (new file) - `/live/create` is a client
+  component and can't export `metadata` itself, so added a segment layout
+  to carry it, same noindex treatment.
+
+This is a real, buildable code gap (unlike the missing logo asset) with
+zero new credentials needed, so it was fixed rather than just documented.
+Commit `d6b8671`.
+
+### Also found and fixed while re-reading `jukeIntegrationManifest.ts`
+(dispatched one Explore sub-agent for a fifth close read of this file,
+per Run 9's pointer that it has yielded a new genuine finding on four
+consecutive prior reads - both of its findings independently re-verified
+against the real code before fixing, per instructions)
+
+1. **`juke-status-richer` SHIPPED description claimed the dashboard shows
+   "last 15" webhook events and "last 10" spaces** - `juke-status/page.tsx:155-156`
+   actually slices both to 8 and 6 for what the Overview tab renders (the
+   fuller 15/10 sets are only what `/api/juke/status` and
+   `/juke-integration.md` return unsliced). Run 9 already fixed the page's
+   *own* empty-state copy to say "8" but never touched this independent
+   manifest claim making the same now-stale 15/10 claim. Fixed to
+   describe both the shown-count and the fuller fetched-count accurately.
+2. **The ASCII diagram's CREATE PATH claimed an automatic "redirect to
+   /live/{spaceId}"** after space creation - verified `live/create/page.tsx`
+   end-to-end: no `router.push`/`redirect`/navigation call anywhere; on
+   success it shows a "Space created" panel with explicit "Copy link" and
+   "Open space" actions the user must click. Fixed the diagram to describe
+   the real flow.
+   Commit `cbfdfb2`.
+
+All of build, lint, typecheck, and test (94/94) pass clean as of the last
+commit this run. Pushed all four commits to `origin/main`.
+
+### Explicitly not touched (confirmed blocked on someone outside this
+codebase - same three as every prior run)
+
+- `JUKE_USER_TOKEN` refresh flow
+- Recurring-event cron
+- Agent-in-Juke/ZOE auto-join
+
+### For the next run
+
+- All 4 roadmap items are now individually resolved for this run: item 1
+  (SIWF) done and already reflected in the roadmap; item 2 (signer) still
+  genuinely blocked on an external credential, correctly documented; item
+  3 (custom domain) verified code-consistent, two small real gaps fixed;
+  item 4 (branding) - the boilerplate-metadata bug fixed, but the actual
+  logo/favicon asset gap is real and still needs a human-provided design
+  asset - not something a future run can close from this sandbox either.
+- `jukeIntegrationManifest.ts` has now yielded a genuinely new, real
+  finding on **five** consecutive close reads (Runs 3, 7, 8, 9, 10). At
+  this point treat "this file is exhausted" claims from any single run
+  with real skepticism - it is long, prose-heavy, and easy to skim past
+  already-fixed sections. Worth one more full pass next run before
+  assuming otherwise.
+- `getSupabaseBrowser` (`src/lib/db/supabase.ts`) is still real, working,
+  unused code - same note as Runs 8-9, still a product/scope call.
+- `zukeConfig.brandColor` (`src/zuke.config.ts:14`, `'#855dcd'`) is defined
+  but has zero consumers anywhere in `src` (confirmed via grep) - not a
+  false claim (nothing asserts it's wired up anywhere), so not fixed as a
+  finding, but flagging in case a future run or the branding work above
+  ever wants to actually apply it somewhere.
+- If a future run exhausts fresh Task C angles and this file's well
+  finally runs dry, the general Task B TODO/stale-doc sweep is still the
+  documented fallback per this run's instructions - not abandoned, just
+  deprioritized while Task C had real, unexhausted gaps.
