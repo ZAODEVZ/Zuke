@@ -1912,3 +1912,143 @@ codebase - same three as every prior run)
   unused code - same note as Runs 8-13, still a product/scope call.
 - `zukeConfig.brandColor` is still defined with zero consumers - same note
   as Runs 10-13, flagged in case future branding work wants it.
+
+## Run 15 — 2026-07-12
+
+Read this file fully before starting. Local checkout was HEAD-detached at
+Run 14's last commit (`28092a6`), already equal to `origin/main` (0 commits
+behind) - checked out a tracking `main` branch pointed at it, no fast-forward
+needed. Re-verified from a clean `npm install` (removed `node_modules` first):
+`build`, `lint`, `typecheck`, `test` (94/94) all pass clean before touching
+anything.
+
+### Task A - still correctly ruled out (Run 1). Re-verified
+`juke-api-reads.ts` directly this run: still only GET-by-id and DELETE-by-id
+for webhooks, no list-by-URL endpoint. Nothing has changed.
+
+### Task C - re-verified all 4 roadmap items directly against current code;
+no change in status on any of them
+
+1. **Item 1 (SIWN)** - re-grepped every `ZUKE_ADMIN_PASSWORD` consumer in
+   `src/`: still exactly `session.ts:48-53`'s explicitly opt-in legacy
+   fallback block, unchanged. Already correctly absent from
+   `setup-zuke.md`'s roadmap list. No change.
+2. **Item 2 (signer)** - re-read `src/lib/publish/auto-cast.ts` in full:
+   still an unconditional stub (logs, returns `null`), still zero real
+   credential references anywhere in `src/`, `docs/`, or top-level `*.md`
+   beyond the same honest stub-caveat text every prior run found. Confirmed
+   still blocked on a @thezao Farcaster signer this sandbox cannot
+   provision or fake. No change.
+3. **Item 3 (custom domain)** - confirmed `setup-zuke.md`'s current
+   `## v1 Roadmap` section still correctly omits the domain item (only
+   "Integrate ZAO signer..." and "Branding..." remain), with the
+   shipped-note intact below it (Run 11's fix). Re-ran a repo-wide grep for
+   `zaoos.com`/`localhost` in `src/` (excluding `*.test.ts`): zero hits.
+   `zuke.config.ts`'s `getBaseUrl()` resolution-order comment still
+   accurately describes the live custom-domain state. No change needed.
+4. **Item 4 (branding)** - re-checked `public/` (still only the five
+   unmodified create-next-app SVGs) and `src/app/favicon.ico` (md5
+   `c30c7d42707a47a3f4591831641e50dc`, byte-identical to Runs 10-14's check
+   - still the stock create-next-app default). Root layout metadata (fixed
+   Run 10) still correct. **No new gap; the logo/favicon asset is still the
+   one documented missing piece, still needs a human-provided design
+   asset.**
+
+All 4 roadmap items remain exactly where Runs 11-14 left them: items 1 and
+3 done, item 2 blocked on an external credential, item 4's code-side gap
+already fixed with the design-asset gap itself still real and outside this
+sandbox's control.
+
+### Tenth close read of `jukeIntegrationManifest.ts` (per Run 14's pointer -
+nine consecutive prior close reads each found something new) - one real
+finding, independently re-verified against actual code before fixing
+
+Dispatched one Explore sub-agent for a full line-by-line tenth read,
+explicitly told to re-verify every claim from scratch: all `files:` paths
+(all exist), every SHIPPED description against the file(s) it describes,
+every OPEN_ASKS reason (all five still genuinely open, none secretly
+shipped), the CONVENTIONS array against the real provider registry, both
+status-header versions, both count/slice pairs, the three-table claim, and
+the full `INTEGRATION_ARCHITECTURE_ASCII` diagram line by line. It reported
+exactly one finding, which I independently re-verified against the real
+code myself before fixing:
+
+1. **The diagram's webhook-dispatch table showed `room.finished ->
+   juke_spaces.status='ended'` with no mention of a recap-cast dispatch,**
+   while the parallel `recording.ready` line correctly shows its own
+   `+ autoCastToZao recap to /zao channel` sub-line. Verified directly:
+   `jukeWebhookHandlers.ts:193-232`'s `room.finished`/`room.ended` case
+   does call `autoCastToZao(...)` with a "Just wrapped: {title}" message
+   whenever `ended_via` is `'host'` or `'api'` (skipping idle LiveKit
+   timeouts, where `ended_via` is unset) - exactly what the manifest's own
+   `recap-cast-room-finished` SHIPPED entry (added by an earlier run)
+   already describes in prose a few hundred lines up. The diagram was the
+   one place in the file where that entry's own claim never made it in -
+   the same class of prose/diagram desync Run 8's `hms`/`stage-room` fix
+   and Run 14's `juke_recordings`-in-diagram fix both caught. Added a
+   matching dispatch line, with the same "wired but stubbed" caveat used
+   elsewhere in the same table. Commit `a84a7ea`.
+
+Everything else the sub-agent checked - all `files:` path existence, every
+other SHIPPED/OPEN_ASKS entry, CONVENTIONS, both header versions, both
+count pairs, the three-table claim, and the rest of the diagram - held up
+on independent verification.
+
+### Fallback Task B sweep (per instructions, run in parallel with the
+manifest read since both draw from the same "nothing left to check"
+uncertainty) - completely clean, no findings
+
+Dispatched one Explore sub-agent scoped to areas not covered by a recent
+close read, explicitly excluding `jukeIntegrationManifest.ts` (being read
+by the parallel agent) and every file already fixed/verified clean in Runs
+11-14: `live/create/page.tsx`+`layout.tsx`, `live/import/page.tsx`+
+`ImportXSpaceForm.tsx`, `live/[spaceId]/page.tsx`, `AdminConsole.tsx`,
+`admin/login/page.tsx`, full reads of `recordingsDb.ts`,
+`recordingsStorage.ts`, `recordingParts.ts`, `xSpaces.ts`,
+`jukeSpacesDb.ts`, `jukeChangelog.ts`, `jukeWebhookHandlers.ts` (handler
+bodies, not just docstrings), `providers/{juke,hms,index}.ts`, every
+`scripts/*.ts`/`*.sql` file, `package.json` scripts vs. README/
+setup-zuke.md, and a fresh TODO/FIXME/XXX/HACK/"not yet"/"not implemented"
+grep across `src/`, `docs/`, and top-level `*.md`. Every single claim it
+checked held up against the real code it described - the first fully clean
+fallback sweep since Run 12's (which was also fully clean). No findings to
+fix.
+
+All of build, lint, typecheck, and test (94/94) pass clean as of the last
+commit this run. Pushed to `origin/main`.
+
+### Explicitly not touched (confirmed blocked on someone outside this
+codebase - same three as every prior run)
+
+- `JUKE_USER_TOKEN` refresh flow
+- Recurring-event cron
+- Agent-in-Juke/ZOE auto-join (specifically the *unattended*/auto-join
+  piece - unchanged since Run 13)
+
+### For the next run
+
+- All 4 roadmap items remain in the same state Runs 11-14 left them: items
+  1 and 3 done, item 2 blocked on a @thezao Farcaster signer credential,
+  item 4's code-side gap fixed with the logo/favicon design asset itself
+  still the one open piece. None of these are engineering gaps left in
+  this sandbox's control - say so plainly rather than re-litigating items
+  1-3 from scratch every run.
+- `jukeIntegrationManifest.ts` has now yielded a genuinely new, real
+  finding on **ten** consecutive close reads (Runs 3, 7, 8, 9, 10, 11, 12,
+  13, 14, 15). This run's finding was the same "diagram/prose desync"
+  class Run 8 and Run 14 both found - a SHIPPED entry's prose gets fixed
+  or added but the ASCII diagram's own copy of the same fact doesn't get
+  updated in the same pass. Worth explicitly cross-checking the diagram
+  section whenever a future run touches any SHIPPED entry's prose, rather
+  than treating the diagram as a separate, lower-priority pass.
+- This run's fallback sweep was fully clean for the second time (Run 12,
+  now Run 15) - two of the last four fallback sweeps found nothing, versus
+  real findings in Runs 11, 13, 14. Combined with essentially every file
+  in the repo now having been read at least twice, this is consistent with
+  a genuinely narrowing (not bottomless) backlog outside the manifest file
+  specifically - but Run 13's note about not assuming monotonic narrowing
+  still applies; don't skip the sweep on the strength of this note alone.
+- `getSupabaseBrowser` (`src/lib/db/supabase.ts`) is still real, working,
+  unused code - same note as Runs 8-14, still a product/scope call.
+- `zukeConfig.brandColor` is still defined with zero consumers - same note
+  as Runs 10-14, flagged in case future branding work wants it.
