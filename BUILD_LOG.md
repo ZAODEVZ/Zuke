@@ -1270,3 +1270,155 @@ codebase - same three as every prior run)
   finally runs dry, the general Task B TODO/stale-doc sweep is still the
   documented fallback per this run's instructions - not abandoned, just
   deprioritized while Task C had real, unexhausted gaps.
+
+## Run 11 — 2026-07-12
+
+Read this file fully before starting. Local checkout was HEAD-detached at
+Run 10's last commit but already equal to `origin/main` (0 commits behind) -
+checked out a tracking `main` branch pointed at it, no fast-forward needed.
+Re-verified from a clean `npm install`: `build`, `lint`, `typecheck`, `test`
+(94/94) all pass clean before touching anything.
+
+### Task A - still correctly ruled out (Run 1). Not re-investigated this run;
+nothing prompted a re-check (no changes to Juke's API surface referenced
+anywhere new).
+
+### Task C - re-verified all 4 roadmap items; found and closed one real gap
+Run 10 left half-finished, plus two more manifest findings on a sixth close
+read
+
+1. **Item 1 (SIWN)** - re-confirmed still fully wired, already correctly
+   absent from the roadmap list (Run 2). No change.
+2. **Item 2 (signer)** - re-grepped for "signer" repo-wide; still zero real
+   credential references anywhere. Confirmed still blocked on a @thezao
+   Farcaster signer this sandbox cannot provision or fake. No change.
+3. **Item 3 (custom domain)** - Run 10 verified this item done code-side and
+   said in its BUILD_LOG writeup it should be "marked verified-complete,"
+   but never actually removed it from `setup-zuke.md`'s roadmap list itself
+   - it was still sitting there as an open item. Fixed: removed
+   "Custom domain: zuke.thezao.com" from the `## v1 Roadmap` list, with a
+   short note explaining it shipped and pointing at `NEXT_PUBLIC_SITE_URL`
+   for anyone who needs to pin it explicitly. Same treatment Run 2 gave
+   item 1 once it was done. Confirmed no other file references the roadmap
+   list or repeats this claim. Commit `b934698`.
+4. **Item 4 (branding)** - re-checked `public/` and `src/app/favicon.ico`:
+   still only the five unmodified create-next-app SVGs and the stock
+   favicon, byte-identical to Run 10's check. Re-confirmed no product
+   surface says "ZAO" where it should say "Zuke" - read commit `4d9bfac`'s
+   diff directly this run to confirm what "product surfaces" actually meant
+   (the manifest's self-identification + hardcoded URLs, not every mention
+   of "ZAO" in the app - "ZAO" legitimately still refers to the community/
+   org throughout the UI, e.g. "ZAO Live", "ZAO team", "ZAO dev", which is
+   correct and not a rebrand miss). Root layout metadata (fixed by Run 10)
+   still correct. **No new gap; logo/favicon asset is still the one
+   documented missing piece, still needs a human-provided design asset.**
+
+### Sixth close read of `jukeIntegrationManifest.ts` (per Run 10's pointer -
+five consecutive prior close reads each found something new) - two more
+real findings, both independently re-verified against actual code before
+fixing
+
+Dispatched one Explore sub-agent for a full line-by-line re-read
+specifically hunting for the same class of bug the last five reads found
+(stale counts, dead paths, fictional behavior). It reported two
+discrepancies; both confirmed directly against source before fixing:
+
+1. **CONVENTIONS entry lumped `'songjam'` in with `'stream'` as "reserved
+   ids with no implementation at all."** False for `'songjam'` - verified
+   `src/lib/spaces/xSpaces.ts` (`X_SPACE_PROVIDER = 'songjam'`,
+   `parseXSpaceUrl`/`zukeIdForXSpace`) and
+   `src/app/api/recordings/import-x/route.ts` are real, live code: X Space
+   imports are tagged provider `'songjam'` and inserted into `juke_spaces`
+   via `insertImportedSpace`. It's not a live-audio *backend* (doesn't run
+   alongside Juke for hosting), which is presumably why the false claim
+   crept in, but it is real, shipped, implemented functionality. Only
+   `'stream'` genuinely has zero implementation. Fixed the sentence to
+   describe `'songjam'` accurately as the real X-Space-import provider id,
+   distinct from an unimplemented live-audio backend.
+2. **The markdown-renderer's own hardcoded prose (served at
+   `/juke-integration.md`) claimed "ZAO holds two persisted tables:
+   `juke_spaces` ... and `juke_webhook_events`."** False - a third table,
+   `juke_recordings` (added by `scripts/juke-spaces-migration-4.sql`,
+   confirmed present), is actively read/written by
+   `src/lib/spaces/recordingsDb.ts`, the `recording.ready` webhook handler,
+   `/live/recordings`, and the recap route - not a read against either of
+   the two named tables or against juke.audio directly, contradicting the
+   very next sentence's claim that "every other public surface" is exactly
+   that. Fixed to name all three tables. Checked `README.md`/`setup-zuke.md`
+   /`docs/recap.md` for the same stale "two tables" phrasing - none had it;
+   this was isolated to the manifest. Commit `3794fb5`.
+
+### Fallback Task B sweep (per instructions, since Task C's per-run gaps
+were exhausted after the above) - found and fixed one real, verified issue
+
+Dispatched one Explore sub-agent to sweep areas not the focus of a *recent*
+close read: `src/app/admin/**`, remaining `src/components/spaces/*.tsx`,
+`src/lib/auth/*.ts`, `docs/*.md` not yet covered, and a fresh
+hardcoded-count-next-to-`.slice()`/`.limit()` sweep (the exact bug class
+Runs 9-11 kept finding in the manifest/status page). Admin pages, auth
+files, `docs/recap.md`, and the slice/limit sweep all came back clean on
+independent re-verification - no new findings there. One real finding,
+verified directly against the code myself before fixing:
+
+1. **Run 4's `EndJukeSpaceButton.tsx` fix (commit `f11a0c4`) only corrected
+   the file's docstring, not its own rendered UI text three lines below
+   it, nor the sibling route file that actually produces the underlying
+   status/log/response strings.** Read both files directly: the button's
+   docstring correctly says the end-space endpoint shipped (PR #174) and a
+   404 means a cross-app/iOS-native room - but its `<div>` for the
+   `'fallback'` case still rendered `"(local-only - Juke endpoint not
+   shipped yet)"` to actual users. Separately, `end-space/route.ts` (four
+   distinct spots: its own docstring, an inline comment, a
+   `logger.warn(...)` call, and the JSON `note` field returned to API
+   callers) still said "not yet shipped"/"not yet available" throughout -
+   never touched by Run 4's fix at all. While fixing these, grepped for
+   the same phrase repo-wide and found a fifth, unrelated instance: the
+   `end-space-button` SHIPPED entry's own description in
+   `jukeIntegrationManifest.ts` had the identical stale "endpoint not
+   shipped yet, or cross-app room" phrasing. Fixed all five call sites
+   (button UI text, route docstring, route comment, route log message,
+   route response `note` field, manifest description) to consistently say
+   what Run 4 already established: the endpoint is shipped, a 404 means a
+   cross-app/iOS-native room Zuke doesn't own. Commit `cf4ecc3`.
+
+All of build, lint, typecheck, and test (94/94) pass clean as of the last
+commit this run. Pushed all three commits to `origin/main`.
+
+### Explicitly not touched (confirmed blocked on someone outside this
+codebase - same three as every prior run)
+
+- `JUKE_USER_TOKEN` refresh flow
+- Recurring-event cron
+- Agent-in-Juke/ZOE auto-join
+
+### For the next run
+
+- All 4 roadmap items are now resolved as far as this sandbox can take
+  them: item 1 done, item 2 blocked on an external credential, item 3 now
+  fully done including the roadmap-list removal Run 10 left unfinished,
+  item 4's code-side gap fixed (Run 10) with the logo/favicon asset gap
+  still real and still needing a human-provided design asset. The v1
+  roadmap in `setup-zuke.md` now lists only the two genuinely-still-open
+  items (signer, branding assets) - both blocked on something outside this
+  sandbox, not on engineering time. If both stay blocked, there is no
+  further Task C work to do until one unblocks; a future run should say so
+  plainly rather than re-litigating items 1-3 from scratch every time.
+- `jukeIntegrationManifest.ts` has now yielded a genuinely new, real
+  finding on **six** consecutive close reads (Runs 3, 7, 8, 9, 10, 11).
+  Given how consistently this keeps happening, it's worth treating any
+  single run's "this file is exhausted" claim (including this one) with
+  real skepticism - but also worth noting the findings are getting
+  narrower and more isolated each time (this run's two were a single
+  mislabeled provider id and a stale table count), which is consistent
+  with a genuinely shrinking backlog rather than a bottomless one.
+- This run's real lesson for future doc/message fixes: **when a fix
+  changes a claim, grep for the literal old phrase repo-wide before
+  considering the fix done.** Run 4's `EndJukeSpaceButton.tsx` fix only
+  touched the one file it was looking at and missed four other call sites
+  echoing the same stale string, some in a completely different file. This
+  run's fix used that grep step and caught all five in one pass - worth
+  keeping as standard practice, not just for end-space specifically.
+- `getSupabaseBrowser` (`src/lib/db/supabase.ts`) is still real, working,
+  unused code - same note as Runs 8-10, still a product/scope call.
+- `zukeConfig.brandColor` is still defined with zero consumers - same note
+  as Run 10, flagged in case future branding work wants it.
