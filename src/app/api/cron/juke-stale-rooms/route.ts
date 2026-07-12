@@ -25,7 +25,8 @@ import { getJukeRoomDetail } from '@/lib/spaces/juke-api-reads';
  * Auth: Bearer CRON_SECRET (Vercel cron header). Manual GETs from the
  * outside without the bearer get 401.
  *
- * Runs every 30 minutes via vercel.json cron config.
+ * Runs every 30 minutes via .github/workflows/juke-stale-rooms-cron.yml
+ * (GitHub Actions - Vercel Cron isn't available on the Hobby tier).
  */
 
 const STALE_THRESHOLD_MINUTES = 120;
