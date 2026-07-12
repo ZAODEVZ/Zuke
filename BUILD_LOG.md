@@ -247,3 +247,137 @@ codebase - same three as every prior run)
 - Recap-cast auto-posting is still a stub blocked on a @thezao Farcaster
   signer credential (not one of the three explicitly-excluded items, but
   same category: needs external provisioning, not code).
+
+## Run 3 — 2026-07-12
+
+Read this file fully before starting (per instructions). Fast-forwarded
+local `main` to `origin/main` (10 commits behind, HEAD had detached again -
+same pattern as Run 2, no divergent work lost). Re-verified from a clean
+`npm install`: `npm run build`, `lint`, `typecheck`, `test` (94/94) all
+still pass clean before touching anything.
+
+### Task A — already correctly ruled out (Run 1). Not redone.
+
+Full automation is still not possible without new external credentials
+(Juke issues the webhook secret once, server-side, with no list-webhooks
+endpoint to query against). Nothing has changed since Run 1's writeup.
+
+### Task B — fresh gap sweep, this run's actual work
+
+Checked `docs/recap.md` (flagged by Run 2 as unread) against
+`src/app/api/recordings/recap/route.ts` line-by-line: accurate, no gaps.
+`scripts/juke-spaces-migration-4.sql` also matches its own doc claims
+(juke_recordings table + public `recordings` storage bucket). Nothing to
+fix there.
+
+Ran a fresh grep sweep for TODO/FIXME/stub across `src/` - every hit was
+already-known/honest (hms.ts self-labeled stub, providers/index.ts
+deliberately throws for unimplemented ids, supabase.ts's placeholder
+fallback is a build-safety guard, not a functional gap).
+
+Found and verified two real bugs/overclaims myself (not blindly trusting a
+sub-agent) before fixing:
+
+1. **`src/app/api/juke/space/route.ts` - a real status-code bug.**
+   `providers/juke.ts` returns `status: 503` specifically to mean "Zuke
+   isn't configured" (missing `JUKE_API_KEY`) - a distinct condition from
+   an actual upstream Juke failure. But the route's own status mapping
+   (`result.status >= 500 ? 502 : result.status`) silently collapsed that
+   503 into 502 before it ever reached the client, contradicting the
+   route's own docstring, which explicitly promises the not-configured
+   case "reports 503 rather than failing opaquely." Fixed the mapping to
+   carve out 503 specifically. Also fixed the docstring's stale claim that
+   `JUKE_USER_TOKEN` gates this route - `juke-api.ts`'s own docstring says
+   that bearer-auth path was superseded by key-only auth in 2026-05-22 and
+   is never read here. No consumer currently branches on this route's
+   exact status code (checked `/live/create`, `AdminConsole.tsx`,
+   `/juke-status` - none do), so this was a silent contract violation, not
+   an active outage, but still a real bug worth fixing.
+   Commit: `bf0e8af`.
+
+2. **README's webhook event list was wrong.** Claimed
+   `space.finished` - no such event exists anywhere in
+   `jukeWebhookHandlers.ts`. Real events: `room.started`,
+   `participant.joined`, `participant.left`, `room.finished`/`room.ended`,
+   `recording.ready`. Fixed. Commit: `ab834ba`.
+
+3. **`src/app/api/cron/juke-stale-rooms/route.ts` docstring never got
+   updated when the scheduler mechanism changed.** Said "Runs every 30
+   minutes via vercel.json cron config" - no `vercel.json` exists in this
+   repo at all (confirmed - `find` came back empty), and the GitHub
+   Actions workflow that actually runs it (merged earlier tonight, before
+   this loop started) has its own comment saying Vercel Cron was
+   deliberately not used (Hobby tier). Fixed to name the real mechanism.
+   Commit: `b292f76`.
+
+4. **`jukeIntegrationManifest.ts` (served publicly at `/juke-status`,
+   `/api/juke/status`, `/juke-integration.md`, read by Juke's own team)
+   had three stale `OPEN_ASKS` entries for asks Zuke's own build had
+   already resolved** - verified each against real code, not just against
+   PR mentions in the manifest's own prose, before deleting:
+   - `participant-fids` ("webhooks give a count but not identities") -
+     false; `readParticipant` in `jukeWebhookHandlers.ts` already extracts
+     fid from both events, stored in `juke_spaces.participants` and
+     rendered by `JukeListenerBadge.tsx` ("N ZAO members here" + names).
+   - `partner-sso-bridge` (wanted a trusted-partner pre-mint JWT endpoint)
+     - false; that's exactly `GET /api/juke/partner-token`, already
+       wired into `JukeEmbed.tsx` via `?token=`.
+   - `developer-end-space` (wanted a developer API to end a space) -
+     false, and self-contradicting: this ask's own reason text already
+     says "Confirmed by Nicky 2026-05-24: both ship in their PR #174,"
+     and there's a SHIPPED entry (`host-end-space-button`) for the exact
+     same feature a few lines above it in the same file.
+   Removed all three, added a comment explaining why (following the
+   file's own existing convention - `oss-spec` was removed the same way
+   in an earlier PR). Also fixed `schedule-space-ui`'s SHIPPED
+   description, which claimed `/live/create` has a `scheduled_at` field,
+   an `announceCast` toggle, and a "1h from now" prefill - read the page
+   fully, it only has password + title inputs. The API-level claim
+   (`createSpaceSchema` does accept `scheduledAt`/`announceCast`) is true;
+   only the UI-form claim was false. Corrected to describe reality.
+   Commit: `f00831f`.
+
+5. **`bumpParticipantCount` in `jukeSpacesDb.ts` claimed to be "atomic"** -
+   it's a plain select-then-update, same non-atomic read-modify-write
+   shape as `addParticipant` right below it. A real fix needs a Postgres
+   RPC for a true atomic increment, which means authoring a new migration
+   a human has to apply against the live DB (same category as
+   migration-4.sql) - not something to ship blind from this sandbox
+   without being able to verify it against Supabase. Fixed the comment to
+   say what the code actually does (read-modify-write, narrow race risk
+   under concurrent same-space deliveries, low real-world severity since
+   Juke's retry/backoff makes that rare) instead of claiming a guarantee
+   that doesn't exist. Commit: `e7624fa`.
+
+Dispatched two read-only sub-agents this run (one for the remaining
+routes, one for a wider file sweep) to parallelize reading, per Run 2's
+precedent - every one of the six discrepancies they reported was
+independently re-verified against the actual code myself, by reading the
+files directly, before I fixed anything or wrote it here. All six held
+up; no false positives from either sub-agent this run.
+
+All of build (`npm run build`), lint, typecheck, and test (94/94) pass
+clean as of the last commit this run.
+
+### Explicitly not touched (confirmed blocked on someone outside this
+codebase - same three as every prior run)
+
+- `JUKE_USER_TOKEN` refresh flow
+- Recurring-event cron
+- Agent-in-Juke/ZOE auto-join
+
+### For the next run
+
+- If a real atomic-increment fix for `bumpParticipantCount` is ever
+  wanted, it needs a new SQL migration (a Postgres function + `.rpc()`
+  call) that a human applies against Supabase - do not ship the code
+  change without confirming the migration has actually been applied, or
+  the webhook handler will start erroring on every `participant.joined`/
+  `participant.left` event.
+- Toolchain, recordings pipeline, docs/recap.md, and now the full Juke
+  route surface (space, webhooks, partner-token, admin/*, cron) have all
+  been read end-to-end across Runs 1-3 and their docstrings now match
+  their code. Haven't yet done a close read of `src/app/spaces/**` (the
+  older multi-provider Stage/Video-Room surface predating the Juke
+  provider) or `HostRoomModal.tsx` - worth a look if Task A/B here are
+  ever considered fully closed out.
