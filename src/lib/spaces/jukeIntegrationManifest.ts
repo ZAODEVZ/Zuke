@@ -134,9 +134,13 @@ const SHIPPED: ShippedFeature[] = [
     id: 'recording-shelf',
     title: 'Public /live/recordings shelf',
     description:
-      'Lists ended Juke spaces with recording_url, most-recent first. Server-fetched from juke_spaces. Each card shows the Juke OG image + a "Listen to recording" CTA. Populated by the recording.ready webhook.',
+      'Merges two sources, most-recently-ended first: legacy juke_spaces rows with recording_url set (recording.ready webhook), and any space with a row in juke_recordings (host uploads, imported X Spaces, multi-part) even if recording_url was never set on juke_spaces. Each card shows the Juke OG image (Juke-hosted only) or a generic icon, a source badge (Juke / X Space), and an inline audio player with an "Open in new tab" link when a recording URL exists.',
     shippedAt: '2026-05-23',
-    files: ['src/app/live/recordings/page.tsx', 'src/lib/spaces/jukeSpacesDb.ts'],
+    files: [
+      'src/app/live/recordings/page.tsx',
+      'src/lib/spaces/jukeSpacesDb.ts',
+      'src/lib/spaces/recordingsDb.ts',
+    ],
   },
   {
     id: 'recap-cast',
