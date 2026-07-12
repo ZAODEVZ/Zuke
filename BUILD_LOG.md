@@ -493,3 +493,106 @@ codebase - same three as every prior run)
   nothing new via TODO/FIXME grep or targeted re-reads, it's fair to
   conclude this repo's Task-B backlog is genuinely exhausted for now,
   and to say so plainly rather than manufacture busywork.
+
+## Run 5 — 2026-07-12
+
+Read this file fully before starting. Local `main` had detached again
+(same recurring pattern as every prior run) - fast-forwarded to
+`origin/main` (5 commits). Re-verified from a clean `npm install`:
+`build`, `lint`, `typecheck`, `test` (94/94) all pass clean before
+touching anything.
+
+### Task A - still correctly ruled out (Run 1). Not re-investigated;
+nothing in Juke's API surface has changed since.
+
+### Task B
+
+Fresh TODO/FIXME/stub grep across `src/` turned up nothing new (only the
+already-known, honestly-labeled `hms.ts` stub and `providers/index.ts`'s
+deliberate throw). Confirmed Run 4's `/spaces` cleanup fully held - a
+repo-wide grep for `"/spaces"` / `'/spaces'` in `src/` now returns zero
+hits.
+
+Dispatched one read-only sub-agent (Explore) to sweep the remaining
+corners of the app Runs 1-4 hadn't individually confirmed clean
+(`src/components/spaces/{RecordingsManager,ImportXSpaceForm,JukeListenerBadge}.tsx`,
+`src/app/admin/**`, `src/app/api/auth/**`, `src/app/live/**`,
+`src/app/juke/page.tsx`, `jukeChangelog.ts`). It reported one candidate
+finding; I independently re-verified it against the real code myself
+before fixing anything (per instructions), and in doing so found two
+more related issues it missed:
+
+1. **`src/app/juke/page.tsx` (public marketing/pitch page) had its own
+   independent, never-synced copy of the deploy instructions - stale in
+   two ways.** Verified directly: it told a deployer to set 6 env vars
+   (`NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
+   `JUKE_API_KEY`, `JUKE_WEBHOOK_SECRET`, `ZUKE_ADMIN_PASSWORD`,
+   `CRON_SECRET`) - omitting `SESSION_SECRET` and `ZUKE_ADMIN_FIDS`,
+   which `session.ts:25-26` throws without on effectively every request
+   (confirmed by reading `getSessionData()` - it unconditionally calls
+   `getSession()` → `sessionOptions()` unless the legacy password cookie
+   matches), and including `ZUKE_ADMIN_PASSWORD` as if it were part of
+   the primary path when it's explicitly a deprecated fallback per that
+   same file's own comment ("Delete this block + ZUKE_ADMIN_PASSWORD
+   ... after task #71 closes"). This is exactly the bug Run 2 found and
+   fixed in README/setup-zuke.md - this page just has its own separate
+   copy that was never updated to match. Also found while reading the
+   same section: its migration step only listed
+   `juke-spaces-migration.sql` and `-2.sql`, missing `-3.sql` and
+   `-4.sql` (both exist in `scripts/`, and `-4.sql` is required for the
+   recordings feature this same page advertises). Fixed both the env var
+   list and the migration list, plus two "drop in 6 env vars" prose
+   mentions elsewhere on the page that no longer matched. Commit
+   `681480c`.
+
+2. **`setup-zuke.md`'s env var list (the one Run 2 fixed) was itself
+   still missing `CRON_SECRET` entirely - a gap none of Runs 1-4 caught.**
+   Verified by reading `.github/workflows/juke-stale-rooms-cron.yml`
+   (this run's background context: the cron scheduler merged earlier
+   tonight) alongside `/api/cron/juke-stale-rooms/route.ts`: the route
+   500s without `CRON_SECRET` set as an app env var, and the workflow
+   itself needs `CRON_SECRET` *and* `ZUKE_BASE_URL` set as separate
+   **GitHub Actions repo secrets** to actually call it - neither of
+   which setup-zuke.md (or README, which defers to it) mentions
+   anywhere. A deployer following the doc literally would provision
+   everything else correctly and still have the stale-room sweep 401
+   forever with no indication why. Added `CRON_SECRET` to the env var
+   list plus a paragraph explaining the GitHub Actions repo-secret
+   requirement. While in that file, also fixed a small leftover
+   inconsistency in the route's own docstring
+   (`/api/cron/juke-stale-rooms/route.ts:25`): it still said "Bearer
+   CRON_SECRET (Vercel cron header)", contradicting the GitHub-Actions
+   explanation three lines below it in the same comment block (Run 3
+   fixed the scheduler-mechanism line but missed this parenthetical).
+   Commit `3c3fdaa`.
+
+All of build, lint, typecheck, and test (94/94) pass clean as of the
+last commit this run.
+
+### Explicitly not touched (confirmed blocked on someone outside this
+codebase - same three as every prior run)
+
+- `JUKE_USER_TOKEN` refresh flow
+- Recurring-event cron
+- Agent-in-Juke/ZOE auto-join
+
+### For the next run
+
+- `src/app/juke/page.tsx` and `setup-zuke.md`/README should now be
+  consistent with each other and with actual required env vars
+  (`NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
+  `JUKE_API_KEY`, `JUKE_WEBHOOK_SECRET`, `SESSION_SECRET`,
+  `ZUKE_ADMIN_FIDS`, `CRON_SECRET`, plus optional
+  `ZUKE_ADMIN_PASSWORD`/`NEYNAR_API_KEY`) and the real 4-file migration
+  list. Worth a spot-check next run that nothing drifts again if new env
+  vars get added.
+- This run's sub-agent sweep covered admin pages, auth routes,
+  live/**, and the remaining spaces components and found them clean on
+  independent verification. Combined with Runs 1-4, essentially all of
+  `src/app`, `src/lib/spaces`, and the top-level docs have now been read
+  end-to-end at least once. If a Run 6 finds nothing new via grep or a
+  fresh targeted re-read, it's fair to conclude this repo's Task-B
+  backlog is genuinely exhausted and say so rather than manufacture
+  busywork - this note has said something similar before (Run 4) and a
+  real gap still turned up, so keep checking, but don't force it if
+  there's truly nothing left.
