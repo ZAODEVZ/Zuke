@@ -209,7 +209,7 @@ export default async function ZukeProductPage() {
                   >
                     github.com/ZAODEVZ/Zuke
                   </a>
-                  . MIT-style license. Next.js 16 + Supabase + Juke developer API.
+                  . Next.js 16 + Supabase + Juke developer API.
                 </p>
                 <CodeBlock>git clone https://github.com/ZAODEVZ/Zuke.git</CodeBlock>
               </>
@@ -221,7 +221,7 @@ export default async function ZukeProductPage() {
             body={
               <>
                 <p className="text-sm text-gray-300">
-                  Create a Supabase project. Apply the two migration files in{' '}
+                  Create a Supabase project. Apply the four migration files in{' '}
                   <code className="text-[#a78bfa]">scripts/</code>:
                 </p>
                 <CodeBlock>{`scripts/juke-spaces-migration.sql
