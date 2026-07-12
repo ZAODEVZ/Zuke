@@ -1422,3 +1422,145 @@ codebase - same three as every prior run)
   unused code - same note as Runs 8-10, still a product/scope call.
 - `zukeConfig.brandColor` is still defined with zero consumers - same note
   as Run 10, flagged in case future branding work wants it.
+
+## Run 12 — 2026-07-12
+
+Read this file fully before starting. Local checkout was HEAD-detached at
+Run 11's last commit (`ce8396a`), already equal to `origin/main` (0 commits
+behind) - checked out a tracking `main` branch pointed at it, no fast-forward
+needed. Re-verified from a clean `npm install`: `build`, `lint`, `typecheck`,
+`test` (94/94) all pass clean before touching anything.
+
+### Task A - still correctly ruled out (Run 1). Not re-investigated this run;
+nothing prompted a re-check (no changes to Juke's API surface referenced
+anywhere new since Run 4/7's last direct re-verification of
+`juke-api-reads.ts`).
+
+### Task C - re-verified all 4 roadmap items directly against current code;
+no change in status on any of them
+
+1. **Item 1 (SIWN)** - re-grepped every `ZUKE_ADMIN_PASSWORD` consumer in
+   `src/`: still exactly `session.ts:48-53`'s explicitly-opt-in legacy
+   fallback block, unchanged since Run 2/10/11 confirmed it done. Already
+   correctly absent from `setup-zuke.md`'s roadmap list. No change.
+2. **Item 2 (signer)** - re-grepped "signer" repo-wide and re-read
+   `src/lib/publish/auto-cast.ts` in full: still an unconditional stub (logs,
+   returns `null`), still zero real credential references anywhere in code,
+   env vars, or docs. Confirmed still blocked on a @thezao Farcaster signer
+   this sandbox cannot provision or fake. No change.
+3. **Item 3 (custom domain)** - already removed from the roadmap list by
+   Run 11 (commit `b934698`); re-confirmed `setup-zuke.md`'s current `## v1
+   Roadmap` section only lists the signer and branding items, with the
+   custom-domain note intact below it. No change needed.
+4. **Item 4 (branding)** - re-checked `public/` (still only the five
+   unmodified create-next-app SVGs) and `src/app/favicon.ico` (md5
+   `c30c7d42707a47a3f4591831641e50dc`, byte-identical to Run 10/11's check -
+   still the stock create-next-app default). **No new gap; the logo/favicon
+   asset is still the one documented missing piece, still needs a
+   human-provided design asset.** Root layout metadata (fixed Run 10) still
+   correct.
+
+All 4 roadmap items are unchanged from Run 11's resolution: items 1 and 3
+done, item 2 blocked on an external credential, item 4's code-side gap
+already fixed with the asset gap itself still real and outside this
+sandbox's ability to close.
+
+### Seventh close read of `jukeIntegrationManifest.ts` (per Run 11's
+pointer - six consecutive prior close reads each found something new) - one
+more real finding, independently re-verified before fixing
+
+Dispatched one Explore sub-agent for a full line-by-line seventh read,
+explicitly told to re-verify every claim (SHIPPED descriptions, OPEN_ASKS
+reasons, CONVENTIONS bullets, diagram lines, file paths, counts, header
+versions) against current code rather than trusting any prior run's "fixed"
+label. It checked all 28 file paths, both status-header versions, the
+8-of-15/6-of-10 count pair, the three-table claim, the provider-id
+CONVENTIONS bullet (already corrected by Run 11), the webhook verifier
+details, every remaining SHIPPED/OPEN_ASKS entry, and the full ASCII
+diagram - all held up. It reported exactly one finding, which I
+independently verified against the real code myself before fixing:
+
+1. **`recording-shelf` SHIPPED description (line 137) was stale relative to
+   a page rewrite that happened after this entry's `shippedAt: '2026-05-23'`
+   date.** It claimed the shelf "Lists ended Juke spaces with recording_url"
+   "Server-fetched from juke_spaces" with a "Listen to recording" CTA,
+   "Populated by the recording.ready webhook." Read
+   `src/app/live/recordings/page.tsx` in full myself: `safeListRecordingsShelf`
+   explicitly merges two sources (its own docstring: "legacy path: juke_spaces
+   rows... new path: any space that has a row in juke_recordings... even if
+   recording_url was never set"), calling both `listRecordedJukeSpaces` and
+   `listRecentRecordedSpaceIds` (confirmed the latter's real implementation in
+   `recordingsDb.ts:133-154`: queries `juke_recordings`, excludes
+   `source: 'snippet'`). Repo-wide grep for `"Listen to recording"` returns
+   zero hits anywhere except the manifest's own stale line - the real card
+   (`RecordingCard`) renders an inline `<audio controls>` player plus a
+   separate "Open in new tab" link, not a CTA button. The OG-image claim is
+   also incomplete: it's Juke-hosted-only (`isJukeHosted` check), with a
+   generic icon + source badge ("Juke"/"X Space") for imports/uploads.
+   Rewrote the description to state the real two-source merge, the real
+   card contents, and added the missing `recordingsDb.ts` to `files:`.
+   Commit `0cb1bf8`.
+
+Everything else the sub-agent checked - all 28 `files:` paths, both header
+versions, both count pairs, the three-table claim, CONVENTIONS, the webhook
+verifier, every other SHIPPED/OPEN_ASKS entry, the removed-entries comments,
+and the ASCII diagram - held up on independent verification. No further
+findings.
+
+### Fallback Task B sweep (per instructions, since Task C's per-run gaps
+were exhausted after the above) - clean, no findings
+
+Dispatched one Explore sub-agent in parallel with the manifest read, scoped
+to areas not the focus of a *recent* close read: all six files under
+`scripts/` (including a live `npm view` re-check of the `viem` override's
+continued necessity against `@farcaster/auth-client`'s actual `viem`
+peer/dependency range - still required, still correct), a full end-to-end
+`README.md` read, `package.json`'s scripts/overrides, a side-by-side re-read
+of `.github/workflows/juke-stale-rooms-cron.yml` against the route it calls,
+and confirmation that `docs/recap.md` remains the only file under `docs/`.
+Every area came back clean on independent verification - no new findings.
+Also ran a fresh TODO/FIXME/XXX/HACK/STUB grep across `src/` myself: same
+honestly-labeled `hms.ts` stub and `auto-cast.ts` stub as every prior run,
+nothing new.
+
+All of build, lint, typecheck, and test (94/94) pass clean as of the last
+commit this run. Pushed to `origin/main`.
+
+### Explicitly not touched (confirmed blocked on someone outside this
+codebase - same three as every prior run)
+
+- `JUKE_USER_TOKEN` refresh flow
+- Recurring-event cron
+- Agent-in-Juke/ZOE auto-join
+
+### For the next run
+
+- All 4 roadmap items remain in the same state Run 11 left them: items 1
+  and 3 done, item 2 blocked on a @thezao Farcaster signer credential, item
+  4's code-side gap fixed with the logo/favicon design asset itself still
+  the one open piece - none of these are engineering gaps left in this
+  sandbox's control. Until one of the two blocked items unblocks (a signer
+  credential shows up, or a human provides logo/favicon assets), there is no
+  further Task C work to do - say so plainly rather than re-litigating
+  items 1-3 from scratch every run.
+- `jukeIntegrationManifest.ts` has now yielded a genuinely new, real finding
+  on **seven** consecutive close reads (Runs 3, 7, 8, 9, 10, 11, 12), though
+  this run's was the narrowest yet (one stale SHIPPED description, versus
+  whole fictional entries in earlier runs) - consistent with Run 11's note
+  that the backlog here is shrinking, not bottomless. Given how narrow this
+  run's finding was and how much of the file has now been independently
+  re-verified clean multiple times, it's reasonable for a Run 13 to treat a
+  fully-clean eighth read as real evidence this specific file is finally
+  exhausted, rather than assuming there must always be one more finding.
+- The fallback Task B sweep this run (scripts/, README.md, package.json,
+  the cron workflow, docs/) came back completely clean - the first fully
+  clean fallback sweep since this pattern started. Combined with Run 9's
+  note and this run's result, essentially every corner of this repo has now
+  been read at least once, several corners many times, and genuinely fresh
+  ground is getting hard to find. If a Run 13 also comes up empty on both
+  Task C and a fallback sweep, it's fair to say the backlog is exhausted for
+  now rather than manufacturing busywork.
+- `getSupabaseBrowser` (`src/lib/db/supabase.ts`) is still real, working,
+  unused code - same note as Runs 8-11, still a product/scope call.
+- `zukeConfig.brandColor` is still defined with zero consumers - same note
+  as Run 10-11, flagged in case future branding work wants it.
