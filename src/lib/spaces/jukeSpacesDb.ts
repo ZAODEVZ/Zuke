@@ -307,8 +307,13 @@ export async function updateJukeSpace(
   if (error) throw new Error(`updateJukeSpace failed: ${error.message}`);
 }
 
-/** Increment / decrement the participant count atomically when a participant
- * event fires. Falls back to an absolute count if the row is missing. */
+/** Increment / decrement the participant count when a participant event
+ * fires. Read-modify-write, not atomic - two concurrent webhook deliveries
+ * for the same space could race and drop an update. Acceptable for now:
+ * Juke's own retry/backoff schedule (t=0/+10s/+60s/+300s) makes same-space
+ * concurrent deliveries rare, and this count is a passive UI signal, not a
+ * value anything depends on being exact. Falls back to an absolute count if
+ * the row is missing. */
 export async function bumpParticipantCount(id: string, delta: number): Promise<void> {
   const { data } = await sb
     .from('juke_spaces')
