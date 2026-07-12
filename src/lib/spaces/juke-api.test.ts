@@ -200,7 +200,7 @@ describe('createJukeSpace', () => {
       json: async () => {
         throw new Error('Unexpected token');
       },
-    } as Response);
+    } as unknown as Response);
 
     const result = await createJukeSpace({ title: 'ZAO Live' }, CREDS);
 
