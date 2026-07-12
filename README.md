@@ -29,7 +29,7 @@ npm run test      # Run tests
 ## Architecture
 
 - **Rooms**: Created via Juke's API, synced to Supabase `juke_spaces` table
-- **Webhooks**: Juke sends real-time events (participant.joined, space.finished, etc.)
+- **Webhooks**: Juke sends real-time events (room.started, participant.joined, participant.left, room.finished/room.ended, recording.ready)
 - **Auth**: SIWF + FID allowlist (iron-session) is the live admin path; the legacy `zuke_admin` password cookie still works as a back-compat fallback pending removal (see `src/lib/auth/session.ts`)
 - **Casting**: Auto-cast stub (`src/lib/publish/auto-cast.ts` always no-ops) - the webhook handlers already call it, but no @thezao Farcaster signer credential is provisioned yet
 
