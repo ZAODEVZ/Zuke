@@ -103,12 +103,14 @@ function isJukeRowProbablyLive(row: JukeSpaceRow): boolean {
 }
 
 export default async function ListenPage() {
-  const [liveRaw, scheduled, recorded] = await Promise.all([
+  const [liveRaw, scheduled, recordedRaw] = await Promise.all([
     safe(listActiveJukeSpaces(16), []),
     safe(listScheduledJukeSpaces(4), []),
-    safe(listRecordedJukeSpaces(6), []),
+    safe(listRecordedJukeSpaces(7), []),
   ]);
   const live = liveRaw.filter(isJukeRowProbablyLive).slice(0, 8);
+  const hasMoreRecorded = recordedRaw.length > 6;
+  const recorded = recordedRaw.slice(0, 6);
 
   return (
     <div className="flex min-h-[100dvh] flex-col bg-[#0a1628] text-white">
@@ -166,7 +168,7 @@ export default async function ListenPage() {
         <Section
           title="Recently recorded"
           count={recorded.length}
-          link={recorded.length > 6 ? { href: '/live/recordings', label: 'See all' } : undefined}
+          link={hasMoreRecorded ? { href: '/live/recordings', label: 'See all' } : undefined}
         >
           {recorded.length === 0 ? (
             <EmptyHint label="The first ZAO Juke recording will land here." />
