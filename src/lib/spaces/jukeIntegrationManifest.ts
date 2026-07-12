@@ -261,7 +261,7 @@ const SHIPPED: ShippedFeature[] = [
     id: 'agent-join-consumer',
     title: 'Consumer code for the agent-join endpoint (admin-triggered; auto-join off by default)',
     description:
-      "joinAgentInJukeRoom (src/lib/spaces/jukeAgentJoin.ts) calls Juke's free, key-only POST /v1/developer/rooms/{id}/agent-join (shipped 2026-05-23; data-publish only in v1, audio-publish is v1.x roadmap) and is wired into two call sites: an admin-only route (POST /api/juke/admin/agent-join, mints a short-lived session_token for the caller to store) and an auto-join hook on the room.started webhook, gated off by default behind ZAO_AUTO_AGENT_JOIN (isAutoAgentJoinEnabled()). The mechanism works today for a human-triggered admin join; the auto-join hook exists but stays off because ZOE has no VPS-side consumer for the minted session_token yet - flipping the flag before that exists would join + immediately drop the token with no value. See the 'agents' OPEN_ASKS entry for what's still actually blocked.",
+      "Juke's free, key-only POST /v1/developer/rooms/{id}/agent-join (shipped 2026-05-23; data-publish only in v1, audio-publish is v1.x roadmap) has two independent consumers in this repo: POST /api/juke/admin/agent-join (an admin-only route with its own inline fetch to the endpoint, mints a short-lived session_token for the caller to store) and the shared helper joinAgentInJukeRoom (src/lib/spaces/jukeAgentJoin.ts), called from an auto-join hook on the room.started webhook, gated off by default behind ZAO_AUTO_AGENT_JOIN (isAutoAgentJoinEnabled()). The two do not share code - the admin route does not call joinAgentInJukeRoom. The mechanism works today for a human-triggered admin join; the auto-join hook exists but stays off because ZOE has no VPS-side consumer for the minted session_token yet - flipping the flag before that exists would join + immediately drop the token with no value. See the 'agents' OPEN_ASKS entry for what's still actually blocked.",
     shippedAt: '2026-05-23',
     files: [
       'src/lib/spaces/jukeAgentJoin.ts',
@@ -393,12 +393,13 @@ export const INTEGRATION_ARCHITECTURE_ASCII = String.raw`
     |    room.started      -> juke_spaces.status='active'
     |    room.finished     -> juke_spaces.status='ended'
     |    participant.*     -> juke_spaces.participant_count
-    |    recording.ready   -> juke_spaces.recording_url
+    |    recording.ready   -> juke_spaces.recording_url (first part, back-compat)
+    |                        + juke_recordings insert (every part, idempotent)
     |                        + autoCastToZao recap to /zao channel
     |                          (wired but stubbed - no @thezao signer yet,
     |                           logs-and-no-ops; see 'recap-cast' below)
     v
-  Supabase juke_spaces + juke_webhook_events
+  Supabase juke_spaces + juke_webhook_events + juke_recordings
 
   CREATE PATH (host):
     USER -> /live/create
