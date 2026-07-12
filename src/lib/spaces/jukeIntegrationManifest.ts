@@ -169,9 +169,9 @@ const SHIPPED: ShippedFeature[] = [
   },
   {
     id: 'schedule-space-ui',
-    title: 'Schedule-a-space UI on /live/create',
+    title: 'scheduledAt support in the space-create API',
     description:
-      'Operator form to pre-create Juke spaces with a real scheduled_at - threads through to Juke. Optional announceCast toggle. Pre-fills "1h from now, rounded up to the next half hour".',
+      'POST /api/juke/space accepts an optional ISO-8601 scheduledAt and threads it through to Juke (createSpaceSchema in the route). The public /live/create page itself only exposes password + title fields, no scheduled_at input or time prefill - scheduling a space currently requires calling the API directly with a scheduledAt value.',
     shippedAt: '2026-05-23',
     files: ['src/app/live/create/page.tsx', 'src/app/api/juke/space/route.ts'],
     reference: 'Juke 2026-05-23 PR — scheduled spaces (item #5)',
@@ -293,36 +293,12 @@ const OPEN_ASKS: OpenAsk[] = [
     priority: 'p0',
   },
   {
-    id: 'participant-fids',
-    title: 'Participant FID list',
-    reason:
-      'participant.joined/left webhooks give us a count but not the identities. We want to show "3 ZAO members are here" on /live and @-mention attendees in the recap cast. Either a GET /v1/rooms/{id}/participants endpoint, or include fid on the participant.* webhook payload.',
-    blocks: '"Who from ZAO is here" badge + recap @-mentions',
-    priority: 'p1',
-  },
-  {
     id: 'desktop-mic',
     title: 'Desktop browser mic publish confirmation',
     reason:
       'When a desktop SIWF user is promoted, does the web SDK actually grant mic-publish, or does it fail silently? We do not want a "Speak" CTA on desktop that breaks under load. A "yes works" / "iOS-only for now" answer is enough to set the UI right.',
     blocks: 'Honest desktop "Speak from this browser" CTA on /live/{id}',
     priority: 'p1',
-  },
-  {
-    id: 'partner-sso-bridge',
-    title: 'Parent-frame SSO so authed users on partner sites do not re-sign',
-    reason:
-      "ZAO uses Sign In With Neynar (SIWN) - a managed signer registered by ZAO's app FID. Juke uses SIWF (fresh EIP-4361 SIWE in the moment by user's custody). Different primitives, so a direct hand-off does not exist - a ZAO user already signed in at zaoos.com still has to do a second SIWF dance inside the Juke iframe to react/raise hand/speak. Anonymous listen is fine (one-tap autoplay bypass). Three options for an SSO bridge, in ascending lift on your side: (1) Parent-frame Quick Auth via postMessage - ZAO posts {fid, signed-proof} into the iframe, Juke mints its JWT without showing the QR. You already have the miniapp Quick Auth code path; this is essentially 'trust the parent frame like a miniapp host'. (2) Trusted-partner pre-mint endpoint - ZAO server POSTs {fid, signed-proof} to a Juke endpoint, gets back a short-lived Juke JWT, passes it as ?token=... on the iframe src. Juke trusts ZAO because we hold a developer key + a registered allowed_origin. Cleanest SSO. (3) Quick Auth via the Farcaster miniapp shell already exists but only works when ZAO is loaded INSIDE the FC client, not on zaoos.com directly. Any of these closes the double-sign-in.",
-    blocks: 'Friction-free participate (react / raise hand / speak) inside ZAO OS embeds',
-    priority: 'p1',
-  },
-  {
-    id: 'developer-end-space',
-    title: 'Developer API to end a space (host-end + immediate webhook dispatch)',
-    reason:
-      "Surfaced 2026-05-24 while debugging the missing room.finished webhook. Iframe Leave is a pure LiveKit room.disconnect() with anon: participant identity — no API call to api.juke.audio, so the room stays alive on Juke's side until LiveKit's empty-room 300s timeout. Additionally Juke's own end_room handler was flipping Room.status to 'ended' before livekit teardown, so the room_finished dispatcher's WHERE status='active' filter excluded the row and the outbound webhook silently never fired (same blind spot for iOS host-end). We need either a developer POST /v1/developer/spaces/{id}/end (we'd wire it to a host 'End space' button on /live/{id}), OR room.finished firing synchronously when end_room flips status (not after a 5min wait). Confirmed by Nicky 2026-05-24: both ship in their PR #174 (POST /v1/developer/spaces/{room_id}/end, X-Juke-Api-Key auth, idempotent, fires room.finished inline with ended_via: 'host'|'api' on the payload).",
-    blocks: '/spaces showing dead rooms as Live + recap-cast trigger never firing for host-ended rooms',
-    priority: 'p0',
   },
   {
     id: 'webhook-delivery-log',
@@ -354,6 +330,18 @@ const OPEN_ASKS: OpenAsk[] = [
 // + juke.audio/SKILL.md are the public spec and stay atomic with every ship.
 // Partnership conversation stays open on its own terms; the ask is removed
 // from the queue so the dashboard does not nag.
+
+// The following asks were removed because Zuke's own build already shipped
+// what they were blocking on - re-verified against the code, not just PR
+// mentions, before deleting:
+//   - participant-fids: participant.joined/left already carry fid (readParticipant
+//     in jukeWebhookHandlers.ts), stored in juke_spaces.participants and
+//     rendered by JukeListenerBadge.tsx ("N ZAO members here" + names).
+//   - partner-sso-bridge: option (2) from this ask's own text - a trusted-partner
+//     pre-mint endpoint - is GET /api/juke/partner-token, consumed by
+//     JukeEmbed.tsx via ?token=. Ships the friction-free participate flow.
+//   - developer-end-space: fully covered by the 'host-end-space-button' SHIPPED
+//     entry above (Nicky's PR #174, wired end-to-end).
 
 const CONVENTIONS = [
   'All Juke calls server-side. JUKE_API_KEY never leaves the server.',
