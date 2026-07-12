@@ -346,8 +346,8 @@ function CodeExamplesSection() {
         How ZAO calls Juke
       </h2>
       <p className="text-xs text-gray-500 mb-4 leading-relaxed">
-        Reference snippets so Nicky&apos;s agent can see ZAO&apos;s actual integration patterns. Every line
-        matches the live production code paths.
+        Reference snippets so Nicky&apos;s agent can see ZAO&apos;s actual integration patterns, simplified
+        for readability - each is drawn from the file named above it.
       </p>
       <div className="space-y-3">
         <CodeBlock
@@ -388,7 +388,10 @@ if (!timingSafeEqual(
   Buffer.from(parsed.v1, 'utf8'),
 )) return { ok: false, reason: 'Signature mismatch' };
 
-// Plus: reject ts more than 5min from now (replay window).`}
+// Plus: reject ts more than 5min from now (replay window).
+// Production also retries this HMAC against a few secret-canonicalization
+// variants (e.g. stripped whsec_ prefix) before giving up - see
+// buildSecretVariants() in jukeWebhookVerify.ts.`}
         />
         <CodeBlock
           title="Subscribe to webhooks - src/app/api/juke/admin/register-webhook/route.ts"
