@@ -439,10 +439,11 @@ function ArchitectureSection() {
         </pre>
       </div>
       <p className="text-xs text-gray-500 mt-3 leading-relaxed">
-        ZAO holds two persisted tables: <code className="text-gray-300">juke_spaces</code> (one row per
-        Juke-minted space, publicly readable) + <code className="text-gray-300">juke_webhook_events</code>{' '}
-        (audit + idempotency, service-role only). Every other surface is a read against those two
-        tables or against juke.audio directly.
+        ZAO holds three persisted tables: <code className="text-gray-300">juke_spaces</code> (one row
+        per Juke-minted space, publicly readable), <code className="text-gray-300">juke_webhook_events</code>{' '}
+        (audit + idempotency, service-role only), and <code className="text-gray-300">juke_recordings</code>{' '}
+        (multi-part recording rows, populated by the recording.ready webhook). Every other surface is
+        a read against those three tables or against juke.audio directly.
       </p>
     </section>
   );
