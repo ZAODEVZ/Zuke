@@ -177,34 +177,6 @@ const SHIPPED: ShippedFeature[] = [
     reference: 'Juke 2026-05-23 PR — scheduled spaces (item #5)',
   },
   {
-    id: 'juke-go-live-provider',
-    title: 'Juke as 3rd audio provider in the Go-Live modal',
-    description:
-      'HostRoomModal on /spaces now exposes Juke alongside Stream.io + 100ms. When picked, the modal collapses (mode/theme/gate/multistream hidden), POSTs /api/juke/space, redirects to /live/{spaceId}.',
-    shippedAt: '2026-05-23',
-    files: [
-      'src/lib/spaces/roomsDb.ts',
-      'src/components/spaces/HostRoomModal.tsx',
-      'src/app/spaces/page.tsx',
-    ],
-  },
-  {
-    id: 'spaces-unified-feed',
-    title: 'Unified /spaces Live tab - Juke spaces alongside Stream/100ms',
-    description:
-      'Browser-side juke_spaces query in parallel with the rooms query, realtime subscription on both tables, JukeLiveSection rendered above ZAO stages when active rows exist. Cards route to /live/{id} with a purple Juke accent.',
-    shippedAt: '2026-05-23',
-    files: ['src/app/spaces/page.tsx'],
-  },
-  {
-    id: 'recurring-schedule-script',
-    title: 'Recurring weekly Juke schedule script',
-    description:
-      "scripts/schedule-zao-recurring.ts pre-creates Juke spaces for ZAO's weekly events (fractal call, ZAOstock standups). Idempotent (dedupes against juke_spaces.scheduled_at +/- 30min). Safe to wire into a weekly cron.",
-    shippedAt: '2026-05-23',
-    files: ['scripts/schedule-zao-recurring.ts', 'scripts/zao-recurring-events.json'],
-  },
-  {
     id: 'admin-register-webhook',
     title: 'Admin route to register the Juke webhook server-side',
     description:
@@ -282,6 +254,19 @@ const SHIPPED: ShippedFeature[] = [
     reference: "Nicky 2026-05-24 confirmation: POST /v1/developer/spaces/{room_id}/end, X-Juke-Api-Key auth, idempotent, fires room.finished synchronously with ended_via: 'host'|'api' payload.",
   },
 ];
+
+// Three SHIPPED entries removed 2026-07-12 ('juke-go-live-provider',
+// 'spaces-unified-feed', 'recurring-schedule-script') - unlike every entry
+// above, none had a `pr` reference, and their `files` all named paths that
+// have never existed in this repo (`git log --all --diff-filter=A` returns
+// empty for each of src/app/spaces/page.tsx, HostRoomModal.tsx, roomsDb.ts,
+// scripts/schedule-zao-recurring.ts, zao-recurring-events.json), including a
+// `JukeLiveSection` component referenced nowhere else in the codebase. This
+// manifest is read by Juke's own team as the canonical Zuke-repo build
+// state, so claiming files that were never committed here is a false SHIPPED
+// claim regardless of whether a similar feature exists in the separate
+// ZAOOS monorepo Zuke graduated from. Removed rather than "corrected" since
+// there is no verifiable Zuke-repo implementation to describe.
 
 const OPEN_ASKS: OpenAsk[] = [
   {
