@@ -257,6 +257,19 @@ const SHIPPED: ShippedFeature[] = [
     ],
     reference: "Nicky 2026-05-24 confirmation: POST /v1/developer/spaces/{room_id}/end, X-Juke-Api-Key auth, idempotent, fires room.finished synchronously with ended_via: 'host'|'api' payload.",
   },
+  {
+    id: 'agent-join-consumer',
+    title: 'Consumer code for the agent-join endpoint (admin-triggered; auto-join off by default)',
+    description:
+      "joinAgentInJukeRoom (src/lib/spaces/jukeAgentJoin.ts) calls Juke's free, key-only POST /v1/developer/rooms/{id}/agent-join (shipped 2026-05-23; data-publish only in v1, audio-publish is v1.x roadmap) and is wired into two call sites: an admin-only route (POST /api/juke/admin/agent-join, mints a short-lived session_token for the caller to store) and an auto-join hook on the room.started webhook, gated off by default behind ZAO_AUTO_AGENT_JOIN (isAutoAgentJoinEnabled()). The mechanism works today for a human-triggered admin join; the auto-join hook exists but stays off because ZOE has no VPS-side consumer for the minted session_token yet - flipping the flag before that exists would join + immediately drop the token with no value. See the 'agents' OPEN_ASKS entry for what's still actually blocked.",
+    shippedAt: '2026-05-23',
+    files: [
+      'src/lib/spaces/jukeAgentJoin.ts',
+      'src/app/api/juke/admin/agent-join/route.ts',
+      'src/lib/spaces/jukeWebhookHandlers.ts',
+    ],
+    reference: 'Nicky 2026-05-23 ship: POST /v1/developer/rooms/{id}/agent-join, X-Juke-Api-Key auth, data-only publish in v1.',
+  },
 ];
 
 // Three SHIPPED entries removed 2026-07-12 ('juke-go-live-provider',
@@ -275,10 +288,10 @@ const SHIPPED: ShippedFeature[] = [
 const OPEN_ASKS: OpenAsk[] = [
   {
     id: 'agents',
-    title: 'Agent join surface — when can ZOE sit in a Juke room?',
+    title: 'Agent join surface — when can ZOE sit in a Juke room, unattended?',
     reason:
-      "We're passing allow_agents:true on create, but llms.txt + the 2026-05-23 PR still flag agents as a future surface. We want ZOE (Claude Opus) sitting silently in the weekly fractal + ZAOstock standups taking notes and posting a recap cast after room.finished. Even read-only/observer would unblock half the value.",
-    blocks: 'ZOE-in-Juke (concierge note-taker + recap-cast generator)',
+      "Juke's free key-only agent-join endpoint (2026-05-23 ship, data-publish only in v1) already covers the read-only/observer case this ask originally requested - we're passing allow_agents:true on create and have a working consumer (see the agent-join-consumer SHIPPED entry) that any admin can trigger by hand today. What's still actually missing: ZOE has no VPS-side consumer for the minted session_token, so our own auto-join hook (ZAO_AUTO_AGENT_JOIN) stays off - flipping it before that exists would join + immediately drop the token. We want ZOE (Claude Opus) sitting silently and unattended in the weekly fractal + ZAOstock standups taking notes and posting a recap cast after room.finished; that needs the VPS-side piece, not anything further from Juke.",
+    blocks: 'Unattended ZOE-in-Juke (concierge note-taker + recap-cast generator)',
     priority: 'p0',
   },
   {
