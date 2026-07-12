@@ -334,7 +334,7 @@ const CONVENTIONS = [
   'juke_spaces is publicly readable (RLS allow-all); writes are service-role only.',
   '/live/{spaceId} is fully public — no auth required to listen.',
   'OG metadata pulls juke.audio/space/{id}/opengraph-image, so Juke renders the share card.',
-  "The only live audio backend in this repo is Juke (provider id 'juke'). A full-A/V 'video room' backend ('hms') is registered as a reserved provider id but is an unimplemented stub (see src/lib/spaces/providers/hms.ts) - it does not run alongside Juke yet. 'stream'/'songjam' are reserved ids with no implementation at all.",
+  "The only live-audio backend in this repo is Juke (provider id 'juke'). A full-A/V 'video room' backend ('hms') is registered as a reserved provider id but is an unimplemented stub (see src/lib/spaces/providers/hms.ts) - it does not run alongside Juke yet. 'songjam' is not a live-audio backend but is real and implemented: it's the provider id tagged on X/Twitter Spaces imported after the fact via POST /api/recordings/import-x (src/lib/spaces/xSpaces.ts), not a room Zuke ever hosts live. 'stream' remains a reserved id with no implementation at all.",
 ];
 
 const CONTACT: IntegrationContact = {
@@ -458,7 +458,7 @@ export function renderIntegrationMarkdown(
   lines.push('```');
   lines.push('');
   lines.push(
-    'ZAO holds two persisted tables: `juke_spaces` (one row per Juke-minted space, RLS public-read) and `juke_webhook_events` (audit + idempotency, service-role only). Every other public surface is a read against those two tables or against juke.audio directly.',
+    'ZAO holds three persisted tables: `juke_spaces` (one row per Juke-minted space, RLS public-read), `juke_webhook_events` (audit + idempotency, service-role only), and `juke_recordings` (multi-part recordings - uploads, X Space imports, Juke recording.ready parts, service-role writes). Every other public surface is a read against those tables or against juke.audio directly.',
   );
   lines.push('');
 
