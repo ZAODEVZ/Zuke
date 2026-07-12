@@ -277,8 +277,7 @@ function RecentSpacesSection({ rows }: { rows: RecentJukeSpaceRow[] }) {
         </h2>
         <div className="bg-[#111d2e] border border-white/[0.08] rounded-xl p-4 text-xs text-gray-500">
           No Juke spaces minted yet through this integration. Create one via{' '}
-          <a href="/spaces" className="text-[#f5a623] hover:underline">/spaces (Go Live - Juke)</a>{' '}
-          or <Link href="/live/create" className="text-[#f5a623] hover:underline">/live/create</Link>.
+          <Link href="/live/create" className="text-[#f5a623] hover:underline">/live/create</Link>.
         </div>
       </section>
     );
@@ -399,7 +398,6 @@ Content-Type: application/json
 
 {
   "url": "https://zuke.thezao.com/api/juke/webhooks",
-  "secret": "<JUKE_WEBHOOK_SECRET>",
   "events": [
     "room.started",
     "room.finished",
