@@ -855,3 +855,130 @@ codebase - same three as every prior run)
   already touched - proof the backlog isn't fully dry yet even in
   well-trodden files. Keep reading closely rather than assuming a file is
   "done" just because a prior run edited it once.
+
+## Run 8 — 2026-07-12
+
+Read this file fully before starting. Local `main` had detached again (same
+recurring pattern as every prior run) - fast-forwarded to `origin/main` (30
+commits). Re-verified from a clean `npm install`: `build`, `lint`,
+`typecheck`, `test` (94/94) all pass clean before touching anything.
+
+### Task A - still correctly ruled out (Run 1). Re-verified
+`juke-api-reads.ts` directly this run: still only GET-by-id and
+DELETE-by-id for webhooks, no list-by-URL endpoint. Nothing has changed.
+
+### Task B - found a blind spot in every prior run's `/spaces` cleanup
+
+Fresh TODO/FIXME/stub grep across `src/` turned up nothing new (same
+honestly-labeled `hms.ts` stub as every prior run). Re-ran the
+manifest file-existence check from Run 7's pointer (every `files:` path
+programmatically checked against the filesystem) - all 28 paths still
+exist, that cleanup held.
+
+While re-verifying Task A I re-read `jukeIntegrationManifest.ts` end-to-end
+(same file Run 7 heavily edited) and noticed its `INTEGRATION_ARCHITECTURE_ASCII`
+`String.raw` block still said `USER -> /spaces (Go Live) OR /live/create` in
+the CREATE PATH diagram. `/spaces` was confirmed dead as far back as Run 4
+(no such route anywhere in `src/app`, confirmed again this run via
+`git log --all --diff-filter=A`) and Runs 4-5 believed they'd fully swept
+it - but their greps only matched **quoted** string literals
+(`grep -rn '"/spaces"' src`), which never touches unquoted text inside a
+`String.raw` template or a plain `//` comment. That's exactly where this
+one and two more were hiding:
+
+1. `jukeIntegrationManifest.ts`'s ASCII diagram CREATE PATH line - fixed to
+   `USER -> /live/create` (the only real create entry point).
+2. `jukeIntegrationManifest.ts`'s `host-end-space-button` SHIPPED
+   description - said the mark-ended fallback makes "`/spaces` stop showing
+   dead rooms as Live." Fixed to `/live` (confirmed via Run 4: that's the
+   real public dashboard the fallback actually affects).
+3. `src/app/api/cron/juke-stale-rooms/route.ts`'s 404-handling comment -
+   same "Flip locally so `/spaces` stops listing a row" phrasing. Fixed to
+   `/live`.
+
+While in that area also fixed `src/lib/db/supabase.ts`'s `getSupabaseBrowser`
+comment, which likewise said "Browser-side anon client for `/spaces`
+real-time" - verified via grep that `getSupabaseBrowser` is not called
+anywhere in `src/` at all (dead code, currently unused, kept as an exported
+helper). Rewrote the comment to say that plainly instead of pointing at a
+route that never existed. Did not delete the function itself - it's real,
+working code, just unused; deleting an unused-but-correct export felt like
+scope creep beyond "fix false claims," so left it. Commit `d147c60`.
+
+Ran a full repo-wide `grep -rn "/spaces"` sweep afterward (not restricted to
+quoted forms this time) across both `src/` and the top-level docs
+(`README.md`, `setup-zuke.md`) to make sure nothing else survived - every
+remaining hit is a legitimate substring (`src/lib/spaces/`,
+`src/components/spaces/`, `/v1/developer/spaces` Juke API path, `/i/spaces/`
+X-Space URLs, or Run 7's own explanatory removal comment). Confirmed clean.
+
+### Dispatched one Explore sub-agent to sweep for the same blind-spot class
+elsewhere, independently re-verified both findings myself before fixing
+
+Asked it to specifically hunt for other `String.raw`/large-template-literal
+comments and route/env/feature-status claims embedded in prose rather than
+quoted literals, since that's the exact class of miss this run's fix
+uncovered. It reported two findings, both inside
+`jukeIntegrationManifest.ts` (in sections today's earlier fix hadn't
+touched) - I verified each against the real code before fixing:
+
+1. **`CONVENTIONS` array claimed "Stage rooms (audio Clubhouse) and Video
+   Rooms (full A+V) are ZAO concepts; both live alongside Juke."** False.
+   Grepped for "stage room"/"clubhouse"/"video room" anywhere else in
+   `src/` - zero hits. Read `providers/index.ts`'s registry directly: only
+   `juke` and `hms` have implementations; `hms` (the closest thing to
+   "Video Rooms") is an explicit stub where every method 501s or throws
+   (`providers/hms.ts`); there is no `'stage'` provider id at all, not even
+   a reserved unimplemented one. Rewrote the convention to describe the
+   real registry state (`juke` live, `hms` a registered-but-unimplemented
+   stub, `stream`/`songjam` reserved ids with nothing behind them) instead
+   of claiming two things "live alongside Juke" that don't exist in this
+   repo in any form.
+2. **The ASCII diagram's webhook-dispatch section showed `recording.ready
+   -> ... + autoCastToZao recap to /zao channel` with no caveat**, reading
+   as a live dispatch step. Verified `src/lib/publish/auto-cast.ts` is
+   still a hard no-op stub (logs, returns `null` unconditionally, no
+   @thezao signer provisioned) - exactly what the manifest's own
+   `recap-cast`/`recap-cast-room-finished` SHIPPED entries already caveat
+   in prose ("wiring shipped, posting not yet live"). The diagram was the
+   one place in this file that caveat never reached. Added a matching
+   caveat line to the diagram.
+
+Both are the same file already touched by today's earlier fix, in parts
+(`CONVENTIONS`, the diagram's dispatch section) that fix didn't touch -
+consistent with Run 7's note that this file keeps yielding real findings on
+repeated close reads. Commit `c884b35`.
+
+All of build, lint, typecheck, and test (94/94) pass clean as of the last
+commit this run. Pushed both commits to `origin/main`.
+
+### Explicitly not touched (confirmed blocked on someone outside this
+codebase - same three as every prior run)
+
+- `JUKE_USER_TOKEN` refresh flow
+- Recurring-event cron
+- Agent-in-Juke/ZOE auto-join
+
+### For the next run
+
+- The `/spaces` dead-route cleanup should now be genuinely complete across
+  both quoted and unquoted forms, in both `src/` and top-level docs -
+  verified via an unrestricted `grep -rn "/spaces"` sweep this run, not
+  just the quoted-literal form Runs 4-5 used. If a future run adds new
+  prose/diagrams, keep in mind quoted-literal greps alone will miss dead
+  references inside `String.raw` blocks or plain comments - this run's
+  whole finding was exactly that gap.
+- `jukeIntegrationManifest.ts` has now been closely read end-to-end across
+  Runs 3, 7, and 8, each time surfacing a genuinely new false/stale claim
+  in a part the previous close-read hadn't touched (OPEN_ASKS -> SHIPPED
+  entries -> diagram/prose text this run). It's a large, prose-heavy file
+  that's easy to skim past known-fixed sections and miss the rest - worth
+  one more full line-by-line pass next run before assuming it's finally
+  exhausted, rather than assuming today's fixes were the last of it.
+- `getSupabaseBrowser` (`src/lib/db/supabase.ts`) is real, working,
+  correctly-typed code that is currently called from nowhere in `src/`.
+  Not a false claim (comment now accurately says so), so not fixed as a
+  Task B finding, but flagging in case a future run wants a decision on
+  whether to keep it (something client-side is expected to use it later)
+  or remove it as dead code - that's a product/scope call, not something
+  to force blind from this sandbox.
