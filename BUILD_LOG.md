@@ -2052,3 +2052,189 @@ codebase - same three as every prior run)
   unused code - same note as Runs 8-14, still a product/scope call.
 - `zukeConfig.brandColor` is still defined with zero consumers - same note
   as Runs 10-14, flagged in case future branding work wants it.
+
+## Run 16 — 2026-07-12
+
+Read this file fully before starting. Local checkout was HEAD-detached at
+Run 15's last commit (`71ea1c4`), already equal to `origin/main` (0 commits
+behind) - checked out a tracking `main` branch pointed at it, no fast-forward
+needed. Re-verified from a clean `npm install` (removed `node_modules` first):
+`build`, `lint`, `typecheck`, `test` (94/94) all pass clean before touching
+anything.
+
+### Task A - still correctly ruled out (Run 1). Not re-investigated this run;
+nothing prompted a re-check (no changes to Juke's API surface referenced
+anywhere new since Run 14/15's last direct re-verification of
+`juke-api-reads.ts`).
+
+### Task C - re-verified all 4 roadmap items directly against current code;
+no change in status on any of them
+
+1. **Item 1 (SIWN)** - re-grepped every `ZUKE_ADMIN_PASSWORD` consumer in
+   `src/`: still exactly `session.ts:48-53`'s explicitly opt-in legacy
+   fallback block, unchanged. Already correctly absent from
+   `setup-zuke.md`'s roadmap list. No change.
+2. **Item 2 (signer)** - re-read `src/lib/publish/auto-cast.ts` in full:
+   still an unconditional stub (logs, returns `null`), still zero real
+   credential references anywhere in `src/`, `docs/`, or top-level `*.md`
+   beyond the same honest stub-caveat text every prior run found. Confirmed
+   still blocked on a @thezao Farcaster signer this sandbox cannot
+   provision or fake. No change.
+3. **Item 3 (custom domain)** - confirmed `setup-zuke.md`'s current
+   `## v1 Roadmap` section still correctly omits the domain item (only
+   "Integrate ZAO signer..." and "Branding..." remain), with the
+   shipped-note intact below it (Run 11's fix). Re-ran a repo-wide grep for
+   `zaoos.com`/`localhost` in `src/` (excluding `*.test.ts`): zero hits. No
+   change needed.
+4. **Item 4 (branding)** - re-checked `public/` (still only the five
+   unmodified create-next-app SVGs) and `src/app/favicon.ico` (md5
+   `c30c7d42707a47a3f4591831641e50dc`, byte-identical to Runs 10-15's check
+   - still the stock create-next-app default). **No new gap; the logo/
+   favicon asset is still the one documented missing piece, still needs a
+   human-provided design asset.**
+
+All 4 roadmap items remain exactly where Runs 11-15 left them: items 1 and
+3 done, item 2 blocked on an external credential, item 4's code-side gap
+already fixed with the design-asset gap itself still real and outside this
+sandbox's control.
+
+### Eleventh close read of `jukeIntegrationManifest.ts` (per Run 15's
+pointer - ten consecutive prior close reads each found something new) - one
+real finding, independently re-verified against actual code before fixing
+
+Dispatched one Explore sub-agent for a full line-by-line eleventh read,
+explicitly told to re-verify every claim from scratch: all `files:` paths
+(all exist), every SHIPPED description against the file(s) it describes,
+every OPEN_ASKS reason (all still genuinely open, none secretly shipped),
+the CONVENTIONS array against the real provider registry, both status-header
+versions, both count/slice pairs, the three-table claim, and the full
+`INTEGRATION_ARCHITECTURE_ASCII` diagram line by line. It reported exactly
+one finding, which I independently re-verified against the real code myself
+before fixing:
+
+1. **The `agents` OPEN_ASKS entry claimed "we're passing allow_agents:true
+   on create."** False for the actual production create path. Verified
+   directly: `src/app/live/create/page.tsx:41`'s fetch body is
+   `JSON.stringify({ title: title.trim(), password })` - no `allowAgents`
+   field at all - and `src/lib/spaces/juke-api.ts:141` defaults
+   `allow_agents` to `false` whenever the caller doesn't explicitly supply
+   it. `src/app/api/juke/space/route.ts`'s `createSpaceSchema` does accept
+   an optional `allowAgents`, but nothing on the real `/live/create` page
+   ever sends it. Grepped for the only two places that actually pass
+   `true`: `src/app/admin/AdminConsole.tsx:48` (a dev/admin test console,
+   defaults its own local state to `true`) and
+   `scripts/test-juke-space.ts:53` (a manual test script) - neither is the
+   path used to create real ZAOstock-standup/weekly-fractal rooms the ask
+   is actually about. This undermines the ask's own premise that "any admin
+   can trigger [agent-join] by hand today" against a real event room - it
+   only works against a room created via the admin test console or with the
+   flag set by hand, not one created through the normal `/live/create` flow.
+   Rewrote the reason to name this as a second real gap (allow_agents needs
+   exposing on the real create path) alongside the already-documented
+   VPS-side session-token piece, rather than implying the create-side wiring
+   was already done. Commit `88ad74f`.
+
+Everything else the sub-agent checked - all 30 `files:` paths, every other
+SHIPPED description (including `path-a-iframe`, `path-b-developer-create`,
+`webhook-consumer`, `recap-cast`/`recap-cast-room-finished`,
+`agent-join-consumer`, `host-end-space-button`,
+`developer-reads-and-observability`), the remaining four OPEN_ASKS entries,
+CONVENTIONS, both header versions, both count pairs, the three-table claim,
+and the full ASCII diagram - held up on independent verification.
+
+### Fallback Task B sweep (per instructions, run in parallel with the
+manifest read) - two real findings, both independently verified before
+fixing
+
+Dispatched one Explore sub-agent scoped to areas not covered by a *recent*
+close read (explicitly excluding `jukeIntegrationManifest.ts`, being read by
+the parallel agent): a full fresh read of `juke-status/page.tsx` beyond its
+already-fixed `ArchitectureSection`, `juke/page.tsx`'s env var/migration
+claims, `JukeEmbed.tsx`/`.test.tsx`, `RecordingsManager.tsx`,
+`JukeListenerBadge.tsx`, `partner-token/route.ts` and the four
+`admin/*/route.ts` files, `juke-api.ts`/`juke-api-reads.ts` docstrings
+directly (not just their downstream consumers' docstrings), and a fresh
+TODO/FIXME/STUB/"not yet" grep. It reported two findings, both independently
+re-verified against the real code myself before fixing:
+
+1. **`src/lib/spaces/juke-api.ts:124` - `createJukeSpace`'s own `@param
+   credentials` doc comment still said "The `JUKE_API_KEY` +
+   `JUKE_USER_TOKEN` pair."** Verified directly: the `JukeCredentials`
+   interface (`juke-api.ts:81-84`) has been `apiKey`-only since the
+   2026-05-22 key-only auth switch, and this same file's own top-of-file
+   docstring already says so. Run 3 fixed the identical stale claim
+   downstream in `api/juke/space/route.ts`'s docstring but never touched
+   this file - the actual source of the claim. Fixed. Commit `b69ec0d`.
+2. **`juke-status/page.tsx:349-350`'s `CodeExamplesSection` claimed "Every
+   line matches the live production code paths."** False for the webhook-
+   verification snippet specifically: it showed a single HMAC comparison,
+   but `jukeWebhookVerify.ts:90-103` actually retries the HMAC across
+   several secret-canonicalization variants (`buildSecretVariants` - raw,
+   `whsec_`-stripped, app-prefix-stripped, base64-decoded) before failing,
+   to tolerate ambiguity in how Juke's shared secret should be
+   canonicalized. Softened the blanket "every line matches" claim (the
+   snippets are simplified references, not literal file contents) and added
+   a comment inside the webhook snippet itself naming the real variant-retry
+   behavior it omits. Commit `7be0e1c`.
+
+   Everything else the sub-agent checked - `juke-status/page.tsx`'s stats
+   row, webhook timeline, recent-spaces section, and the rest of
+   `ArchitectureSection`'s prose; `juke/page.tsx`'s migration count and env
+   var list; `JukeEmbed.tsx`/`.test.tsx`'s every prop/behavior claim;
+   `RecordingsManager.tsx`'s media-fragment snippet claim (byte-for-byte
+   against `/api/recordings/snippet/route.ts`); `JukeListenerBadge.tsx`'s
+   overflow-count claim; `partner-token/route.ts` and the four admin routes'
+   docstrings/status-code contracts; `juke-api-reads.ts`'s docstrings; and
+   the TODO/FIXME sweep (nothing new beyond the already-known `hms.ts` and
+   `auto-cast.ts` stubs) - held up on independent verification.
+
+All of build, lint, typecheck, and test (94/94) pass clean as of the last
+commit this run. Pushed all three commits to `origin/main`.
+
+### Explicitly not touched (confirmed blocked on someone outside this
+codebase - same three as every prior run)
+
+- `JUKE_USER_TOKEN` refresh flow
+- Recurring-event cron
+- Agent-in-Juke/ZOE auto-join (specifically the *unattended*/auto-join
+  piece - unchanged since Run 13, now with a second named blocker
+  (`allow_agents` not exposed on the real create path) alongside the
+  VPS-side session-token piece)
+
+### For the next run
+
+- All 4 roadmap items remain in the same state Runs 11-15 left them: items
+  1 and 3 done, item 2 blocked on a @thezao Farcaster signer credential,
+  item 4's code-side gap fixed with the logo/favicon design asset itself
+  still the one open piece. None of these are engineering gaps left in
+  this sandbox's control - say so plainly rather than re-litigating items
+  1-3 from scratch every run.
+- `jukeIntegrationManifest.ts` has now yielded a genuinely new, real
+  finding on **eleven** consecutive close reads (Runs 3, 7, 8, 9, 10, 11,
+  12, 13, 14, 15, 16). This run's finding (`allow_agents:true` not actually
+  set on the real create path) is a case worth flagging distinctly: unlike
+  most prior findings, which were pure doc/prose corrections, this one
+  surfaces a real, if narrow, product question - should `/live/create`
+  expose an `allow_agents` toggle (or default it `true`) so the
+  already-working `agent-join-consumer` can actually target a real event
+  room? That's a scope/product call this run deliberately did not make
+  unilaterally (no design input on whether agents should be on-by-default
+  for real ZAO events) - documented honestly in the ask's reason text
+  instead of either building a toggle blind or leaving the false claim
+  standing. A future run could pick this up as real, buildable feature work
+  if the human owner confirms the intent (e.g. "yes, add an allow_agents
+  checkbox to /live/create" or "yes, default it true for admin-created
+  rooms") - it needs zero new external credentials, unlike items 2 and the
+  design-asset half of item 4.
+- The fallback sweep found two real findings this run (both independently
+  verified) after Run 15's fully-clean sweep - consistent with Run 13's
+  note that clean sweeps don't reliably predict the next one. Both findings
+  were the same "docstring/prose claim goes stale after the code it
+  describes changes elsewhere" class every prior run has repeatedly found -
+  worth continuing to scope fallback sweeps at files not recently
+  close-read by name, rather than assuming a file is done once any part of
+  it has been fixed once.
+- `getSupabaseBrowser` (`src/lib/db/supabase.ts`) is still real, working,
+  unused code - same note as Runs 8-15, still a product/scope call.
+- `zukeConfig.brandColor` is still defined with zero consumers - same note
+  as Runs 10-15, flagged in case future branding work wants it.
