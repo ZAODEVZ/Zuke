@@ -727,3 +727,131 @@ codebase - same three as every prior run)
   end-to-end. If a Run 7 finds nothing new via grep, a fresh targeted
   re-read, or the env-var cross-check above, it's fair to conclude
   this repo's Task-B backlog is genuinely exhausted for now.
+
+## Run 7 — 2026-07-12
+
+Read this file fully before starting. Local `main` had detached again (same
+recurring pattern as every prior run) - fast-forwarded to `origin/main` (2
+commits). Re-verified from a clean `npm install`: `build`, `lint`,
+`typecheck`, `test` (94/94) all pass clean before touching anything.
+
+### Task A - still correctly ruled out (Run 1). Re-verified
+`juke-api-reads.ts` directly this run: still only GET-by-id and
+DELETE-by-id for webhooks, no list-by-URL endpoint. Nothing has changed.
+
+### Task B - env-var cross-check (Run 6's pointer) - clean
+
+Re-ran the env var cross-check Run 6 flagged for this run: every var read
+in `src/lib/env.ts` (9 vars) plus `CRON_SECRET` (read directly in the cron
+route, not via env.ts - fine, not every var needs to route through it) is
+now present in `setup-zuke.md`'s Step 3 list. Nothing missing. TODO/FIXME
+grep across `src/` turned up nothing new (same honestly-labeled `hms.ts`
+stub as every prior run).
+
+### Found and fixed: three fictional SHIPPED entries in
+`jukeIntegrationManifest.ts` - the most significant finding across any run
+so far
+
+While re-reading the manifest end-to-end (last touched by Run 3), noticed
+three SHIPPED entries - `juke-go-live-provider` ("Juke as 3rd audio
+provider in the Go-Live modal"), `spaces-unified-feed` ("Unified /spaces
+Live tab"), and `recurring-schedule-script` ("Recurring weekly Juke
+schedule script") - all named specific implementing files, and unlike
+every other entry in the array, none of the three had a `pr` field to
+corroborate the claim. Verified before touching anything:
+
+- Wrote a one-off script to check every file path referenced anywhere in
+  the manifest's `files:` arrays against the actual filesystem. 5 came back
+  missing, all concentrated in exactly these 3 entries:
+  `src/app/spaces/page.tsx`, `src/components/spaces/HostRoomModal.tsx`,
+  `src/lib/spaces/roomsDb.ts`, `scripts/schedule-zao-recurring.ts`,
+  `scripts/zao-recurring-events.json`.
+- Ran `git log --all --oneline --diff-filter=A` on each of the 5 paths -
+  every single one came back completely empty. These files have never
+  existed anywhere in this repo's history, on any branch, not just
+  "deleted since." This corroborates Run 4's independent finding that
+  `src/app/spaces/**` and `HostRoomModal.tsx` don't exist - Run 4 cleaned
+  up dead `/spaces` links/comments in 4 other files but never went back to
+  check whether the manifest's own SHIPPED claims referenced the same dead
+  paths. They did.
+- Also grepped for `JukeLiveSection`, the component name the
+  `spaces-unified-feed` description claims renders on `/spaces` - zero
+  hits anywhere except the manifest's own description text. Not a real
+  component.
+- This manifest is explicitly the "public build-status surface for the
+  Juke team" (served at `/juke-status`, `/api/juke/status`,
+  `/juke-integration.md`) - the exact kind of external-facing false claim
+  this whole overnight project has been hunting for since Run 1's original
+  stale-rooms-cron discovery.
+
+Removed all three entries (following the file's own established
+convention from Run 3's OPEN_ASKS removal - explanatory comment in place,
+not a silent deletion). Did not attempt to "correct" them to describe a
+possible ZAOOS-repo-side implementation (the manifest's pitch text says
+Zuke "graduated from ZAO OS", and most other entries' PR links do point at
+`bettercallzaal/ZAOOS` - so it's plausible a similar feature shipped
+there) because I have no access to that repo from this session's GitHub
+scope to verify it, and these three entries specifically lack any PR
+reference at all to check against - unlike the properly-cited entries.
+Commit `982c2ed`.
+
+### Found and fixed via one Explore sub-agent's sweep - both independently
+re-verified myself before fixing
+
+Dispatched one read-only sub-agent to sweep areas not yet individually
+confirmed clean by name this week: `RecordingsManager.tsx`,
+`ImportXSpaceForm.tsx`, `JukeListenerBadge.tsx`, `src/app/admin/**`,
+`src/app/api/auth/**`, `src/app/live/**`, a fresh full read of
+`src/app/juke/page.tsx`, `jukeChangelog.ts`, and `README.md`. It reported
+two findings, both in `juke/page.tsx`, both verified directly against the
+file before fixing:
+
+1. **Stale migration count.** Step 2's prose said "Apply the two migration
+   files in scripts/" while the `CodeBlock` two lines below it lists all
+   four `juke-spaces-migration{,-2,-3,-4}.sql` files (migrations 3/4 were
+   added later; the prose count was never updated to match its own code
+   block). Fixed to say "four."
+2. **Unbacked license claim.** Step 1 said the repo ships under an
+   "MIT-style license." Verified: no `LICENSE`/`LICENSE.md` file anywhere
+   in the repo root, no `license` field in `package.json`. Nothing backs
+   the claim. Removed it rather than inventing a `LICENSE` file myself -
+   choosing a project's license is a legal/business decision outside an
+   automated code-audit loop's scope, not something to ship blind.
+
+Both are pure JSX text edits (no logic touched). Commit `36f8147`.
+
+Everything else the sub-agent checked - `RecordingsManager.tsx`,
+`ImportXSpaceForm.tsx`, `JukeListenerBadge.tsx` prop-doc claims;
+`src/app/admin/**` auth-flow claims; `src/app/api/auth/**` docstrings;
+`src/app/live/**` password-gating/scheduling/end-space claims;
+`jukeChangelog.ts`'s fetch/cache/null-on-failure claims; `README.md`'s
+scripts block, webhook event list, and architecture notes - held up on
+independent verification. No further findings there.
+
+All of build, lint, typecheck, and test (94/94) pass clean as of the last
+commit this run.
+
+### Explicitly not touched (confirmed blocked on someone outside this
+codebase - same three as every prior run)
+
+- `JUKE_USER_TOKEN` refresh flow
+- Recurring-event cron
+- Agent-in-Juke/ZOE auto-join
+
+### For the next run
+
+- `jukeIntegrationManifest.ts`'s SHIPPED array should now be fully
+  file-verified - every remaining entry's `files:` paths exist on disk
+  (checked programmatically this run, not just spot-read). Worth
+  re-running that same file-existence check next run only if the manifest
+  gets a new entry added; no need to redo the full sweep otherwise.
+- Env var docs are confirmed complete again this run (the check Run 6
+  asked for). Same caveat as always: re-check if a new var gets added to
+  `env.ts`, don't assume from this note alone.
+- At this point Runs 1-7 combined have read essentially every route, doc,
+  script, config file, and component in this repo end-to-end, more than
+  once in several cases, and this run found a genuinely new, significant
+  gap (the fictional manifest entries) in a file every prior run had
+  already touched - proof the backlog isn't fully dry yet even in
+  well-trodden files. Keep reading closely rather than assuming a file is
+  "done" just because a prior run edited it once.
