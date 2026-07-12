@@ -596,3 +596,134 @@ codebase - same three as every prior run)
   busywork - this note has said something similar before (Run 4) and a
   real gap still turned up, so keep checking, but don't force it if
   there's truly nothing left.
+
+## Run 6 — 2026-07-12
+
+Read this file fully before starting. Local `main` had detached again
+(same recurring pattern as every prior run) - fast-forwarded to
+`origin/main` (5 commits). Re-verified from a clean `npm install`:
+`build`, `lint`, `typecheck`, `test` (94/94) all pass clean before
+touching anything.
+
+### Task A - still correctly ruled out (Run 1). Not re-investigated;
+nothing in Juke's API surface has changed since.
+
+### Task B
+
+Fresh TODO/FIXME/stub grep across `src/` turned up nothing new (same
+honestly-labeled `hms.ts` stub and `providers/index.ts`'s deliberate
+throw as every prior run). `README.md`'s roadmap section no longer
+exists as such (moved into `setup-zuke.md`'s "v1 Roadmap", already
+verified accurate by Run 2) - nothing stale there.
+
+Found and fixed two real, verified env-var documentation gaps - both
+confirmed by reading the actual consuming code myself before touching
+anything, not by trusting either the doc prose or (for #2) the
+sub-agent's report blindly:
+
+1. **`JUKE_CREATE_PASSWORD` was completely missing from every env var
+   list** (`setup-zuke.md` Step 3, `src/app/juke/page.tsx`'s deploy
+   snippet) despite being read in `env.ts:11` and gating the password
+   path of `POST /api/juke/space` (`route.ts:87-90`). Traced the actual
+   consumer: `src/app/live/create/page.tsx`'s form always uses this
+   password path (no admin-session bypass in the UI - the submit button
+   is disabled whenever the password field is empty), so without this
+   var set, `/live/create` can never succeed (`Wrong password` on every
+   attempt). This matters specifically because `setup-zuke.md`'s own
+   Verification section step 2 tells a deployer to use that exact page
+   to "verify Juke integration end to end" - so a deployer following the
+   doc literally would hit a wall at the doc's own suggested smoke test,
+   with zero indication why. Added it to both lists with an explanation
+   in setup-zuke.md's prose. Commit `cd389ca`.
+
+2. **Dispatched one read-only sub-agent** (Explore) to sweep areas no
+   prior run had individually confirmed clean by name: `src/lib/env.ts`,
+   `src/lib/farcaster/neynar.ts`, `next.config.ts`, a repo-wide search
+   for any `middleware.ts` (none exists), every file in `scripts/` not
+   already known-fixed, every `.github/workflows/*` file (only one
+   exists, already known-good), and `package.json`'s scripts block
+   against README/setup-zuke.md's script references. It reported one
+   finding, which I independently re-verified before fixing (it also
+   correctly noticed my own commit for finding #1 landed mid-sweep and
+   re-checked against the post-commit HEAD rather than going stale):
+   `README.md` claims `setup-zuke.md` Step 3 is "the full list" of env
+   vars, but `NEXT_PUBLIC_OPTIMISM_RPC_URL` - read in `env.ts:24`, and
+   actually consumed by `/api/auth/verify/route.ts:19` to configure the
+   RPC endpoint the SIWF signature-verify connector uses - was absent
+   from that list. Lower severity than #1 (it has a working default,
+   `https://optimism-rpc.publicnode.com`, so nothing breaks if left
+   unset), but the "full list" claim was still false. Added it to
+   `setup-zuke.md` with a short explanation of what it configures and
+   its default. Did **not** add it to `juke/page.tsx`'s shorter env var
+   snippet - that list already deliberately omits other optional vars
+   with defaults (`ZUKE_ADMIN_PASSWORD`, `NEYNAR_API_KEY`) and never
+   claims to be exhaustive the way README does, so it wasn't actually
+   misdocumented. Commit `d24ace1`.
+
+   Everything else the sub-agent checked came back clean on independent
+   verification: `env.ts`'s other var defaults/optionality all match
+   real usage; `neynar.ts`'s docstring claims (best-effort/empty-map
+   behavior, 100-fid chunking, server-only) hold up against the actual
+   code and its caller; `next.config.ts` is an empty stub with no
+   claims to violate; `test-juke-space.ts` and the three not-yet-
+   individually-checked migration SQL files (`.sql`, `-2.sql`, `-3.sql`
+   - `-4.sql` was already checked in Run 3) all match their own header
+   comments and the schema/types they claim to mirror; `package.json`'s
+   `dev`/`build`/`typecheck`/`test`/`start` scripts all exist exactly as
+   referenced in README/setup-zuke.md (`lint` exists but isn't mentioned
+   in either doc - merely undocumented, not misdocumented, so not a
+   finding).
+
+### Considered but not turned into a finding
+
+Read `src/lib/auth/nonce.ts` closely (self-signed HMAC nonce + an
+in-memory `Map` for single-use replay protection, consumed by
+`/api/auth/verify`). On Vercel's serverless model a given nonce's
+single-use guarantee only holds within one warm Lambda instance, not
+globally - a real design characteristic, and arguably a gap, but not a
+*documented* claim anywhere that contradicts it (no comment asserts
+global single-use), so it doesn't fit this project's established
+bar for a finding (a stated claim the code doesn't back up). Practical
+severity is also low: exploiting it requires already possessing a
+valid signed SIWF message for a target nonce, which normally only the
+legitimate signer's own browser has. Left untouched rather than either
+inventing a doc caveat to "fix" or attempting a persistent-store
+redesign (new Supabase table + migration a human has to apply,
+same category Run 3 correctly declined for `bumpParticipantCount`)
+without being able to verify it against a live DB from this sandbox.
+Noting it here in case a future run wants to revisit with more
+context (e.g. confirmed Vercel instance-reuse behavior, or a decision
+that this is worth a Supabase-backed nonce store).
+
+All of build, lint, typecheck, and test (94/94) pass clean as of the
+last commit this run.
+
+### Explicitly not touched (confirmed blocked on someone outside this
+codebase - same three as every prior run)
+
+- `JUKE_USER_TOKEN` refresh flow
+- Recurring-event cron
+- Agent-in-Juke/ZOE auto-join
+
+### For the next run
+
+- Env var docs (`setup-zuke.md`, `src/app/juke/page.tsx`) should now
+  list every var that's actually required or has a non-obvious
+  optional/default status: `NEXT_PUBLIC_SUPABASE_URL`,
+  `SUPABASE_SERVICE_ROLE_KEY`, `JUKE_API_KEY`, `JUKE_WEBHOOK_SECRET`,
+  `JUKE_CREATE_PASSWORD`, `SESSION_SECRET`, `ZUKE_ADMIN_FIDS`,
+  `CRON_SECRET`, plus optional `ZUKE_ADMIN_PASSWORD`, `NEYNAR_API_KEY`,
+  `NEXT_PUBLIC_OPTIMISM_RPC_URL`. Worth a final `grep -n
+  'process\.env\.' src/lib/env.ts` cross-check next run just to
+  confirm no ninth var slipped through - I believe this is now
+  genuinely complete, but the last two runs each found exactly one
+  more missed var, so don't assume without checking.
+- `nonce.ts`'s in-memory replay-Map-across-serverless-instances
+  characteristic (see above) is a real but low-severity, undocumented
+  design limitation, not a false claim - left as a note for a future
+  run to decide on, not something to force a fix for blind.
+- Combined with Runs 1-5, essentially every route, doc, script, config
+  file, and component in this repo has now been read at least once
+  end-to-end. If a Run 7 finds nothing new via grep, a fresh targeted
+  re-read, or the env-var cross-check above, it's fair to conclude
+  this repo's Task-B backlog is genuinely exhausted for now.
