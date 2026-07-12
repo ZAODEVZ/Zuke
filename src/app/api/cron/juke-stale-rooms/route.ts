@@ -22,7 +22,8 @@ import { getJukeRoomDetail } from '@/lib/spaces/juke-api-reads';
  * Idempotent: a real room.finished webhook arriving later for the same
  * spaceId is a no-op since the row is already ended.
  *
- * Auth: Bearer CRON_SECRET (Vercel cron header). Manual GETs from the
+ * Auth: Bearer CRON_SECRET, sent by the GitHub Actions workflow below (not
+ * a Vercel cron header - Vercel Cron isn't used here). Manual GETs from the
  * outside without the bearer get 401.
  *
  * Runs every 30 minutes via .github/workflows/juke-stale-rooms-cron.yml

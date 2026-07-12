@@ -38,13 +38,23 @@ SESSION_SECRET=<random-string-32-chars-or-longer>
 ZUKE_ADMIN_FIDS=<comma-separated-farcaster-fids-allowed-as-admin>
 ZUKE_ADMIN_PASSWORD=<optional-legacy-admin-cookie-fallback>
 NEYNAR_API_KEY=<optional-for-recap-pfp-enrichment>
+CRON_SECRET=<random-string-shared-with-the-GitHub-Actions-workflow>
 ```
 
 `SESSION_SECRET` and `ZUKE_ADMIN_FIDS` are required for the live SIWF admin
 auth path (`src/lib/auth/session.ts`) - without `SESSION_SECRET` set to at
 least 32 characters, session handling throws on every request that reaches
 it. `ZUKE_ADMIN_PASSWORD` is only a documented back-compat fallback slated
-for removal once secret rotation (task #71) closes.
+for removal once secret rotation (task #71) closes. `CRON_SECRET` gates
+`GET /api/cron/juke-stale-rooms` (returns 401 without a matching bearer
+token) - it must also be added as a **GitHub Actions repository secret**
+(Settings -> Secrets and variables -> Actions), alongside a
+`ZUKE_BASE_URL` repo secret (your deployed origin, e.g.
+`https://audio.yourbrand.com`), since
+`.github/workflows/juke-stale-rooms-cron.yml` is what actually calls this
+route every 30 minutes - Vercel Cron isn't available on the Hobby tier.
+Without both repo secrets set, the workflow runs but every call 401s and
+stale rooms never get swept.
 
 ## Step 4 - Register Webhook
 
