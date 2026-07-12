@@ -1564,3 +1564,174 @@ codebase - same three as every prior run)
   unused code - same note as Runs 8-11, still a product/scope call.
 - `zukeConfig.brandColor` is still defined with zero consumers - same note
   as Run 10-11, flagged in case future branding work wants it.
+
+## Run 13 — 2026-07-12
+
+Read this file fully before starting. Local checkout was HEAD-detached at
+Run 12's last commit (`4b219b4`), already equal to `origin/main` (0 commits
+behind) - checked out a tracking `main` branch pointed at it. Re-verified
+from a clean `npm install` (removed `node_modules` first): `build`, `lint`,
+`typecheck`, `test` (94/94) all pass clean before touching anything.
+
+### Task A - still correctly ruled out (Run 1). Not re-investigated this run;
+nothing prompted a re-check (no changes to Juke's API surface referenced
+anywhere new).
+
+### Task C - re-verified all 4 roadmap items directly against current code;
+no change in status on any of them
+
+1. **Item 1 (SIWN)** - re-grepped every `ZUKE_ADMIN_PASSWORD` consumer in
+   `src/`: still exactly `session.ts:48-53`'s explicitly-opt-in legacy
+   fallback block. Already correctly absent from `setup-zuke.md`'s roadmap
+   list. No change.
+2. **Item 2 (signer)** - re-grepped "signer" repo-wide and re-read
+   `src/lib/publish/auto-cast.ts` in full: still an unconditional stub (logs,
+   returns `null`), still zero real credential references anywhere in code,
+   env vars, or docs. Confirmed still blocked on a @thezao Farcaster signer
+   this sandbox cannot provision or fake. No change.
+3. **Item 3 (custom domain)** - confirmed `setup-zuke.md`'s current
+   `## v1 Roadmap` section (`- Integrate ZAO signer...` / `- Branding...`)
+   still correctly omits the domain item, with the shipped-note intact below
+   it (Run 11's fix). No change needed.
+4. **Item 4 (branding)** - re-checked `public/` (still only the five
+   unmodified create-next-app SVGs) and `src/app/favicon.ico` (md5
+   `c30c7d42707a47a3f4591831641e50dc`, byte-identical to Runs 10-12's check -
+   still the stock create-next-app default). **No new gap; the logo/favicon
+   asset is still the one documented missing piece, still needs a
+   human-provided design asset.** Root layout metadata (fixed Run 10) still
+   correct.
+
+All 4 roadmap items remain exactly where Run 12 left them: items 1 and 3
+done, item 2 blocked on an external credential, item 4's code-side gap
+already fixed with the design-asset gap itself still real and outside this
+sandbox's control.
+
+### Eighth close read of `jukeIntegrationManifest.ts` (per Run 12's pointer
+- seven consecutive prior close reads each found something new) - one real
+finding, verified myself before fixing
+
+Dispatched one Explore sub-agent for a full line-by-line eighth read,
+explicitly told to re-verify every claim against current code from scratch
+rather than trust any prior "fixed" label - every `files:` path (all ~50
+unique), every SHIPPED description's behavioral claims, every OPEN_ASKS
+entry, the CONVENTIONS array against the real provider registry, the full
+ASCII diagram, both status-header versions, and every slice/count pair. It
+reported exactly one finding, which I independently re-verified against the
+real code myself before fixing:
+
+1. **The `agents` OPEN_ASKS entry was stale - Juke already shipped the
+   read-only/data-publish capability the ask was requesting, and Zuke
+   already has a working consumer for it, undocumented anywhere as
+   SHIPPED.** Verified directly: `src/lib/spaces/jukeAgentJoin.ts`
+   (`joinAgentInJukeRoom`, calling Juke's free key-only
+   `POST /v1/developer/rooms/{id}/agent-join`, shipped 2026-05-23,
+   data-publish only in v1) and `src/app/api/juke/admin/agent-join/route.ts`
+   (the admin-gated route that calls it) are both real, complete,
+   working code - the same surface Run 2 already confirmed
+   "real, complete, correctly-gated implementations" of. Neither file
+   appears anywhere in the manifest's `SHIPPED` array. Meanwhile the ask's
+   reason text said Juke "still flag[s] agents as a future surface" and
+   that "even read-only/observer would unblock half the value" - both
+   already false: the observer-equivalent path (an admin manually
+   triggering a join) is live today. What's genuinely still missing,
+   confirmed by re-reading `isAutoAgentJoinEnabled()`'s doc comment: ZOE has
+   no VPS-side consumer for the minted `session_token`, so the auto-join
+   hook on `room.started` stays off by default
+   (`ZAO_AUTO_AGENT_JOIN=false`) - unchanged from Run 2's conclusion that
+   *unattended* ZOE-in-Juke is blocked outside this sandbox, not an
+   engineering gap in Zuke's code. Added a new `agent-join-consumer` SHIPPED
+   entry (files, description, PR reference, matching the array's existing
+   style) and rewrote the `agents` ask's reason/title to state what's
+   actually still open - the VPS-side piece, not anything further from
+   Juke's API. Commit `a3228f6`.
+
+Everything else the sub-agent checked - all `files:` paths, both header
+versions, both count pairs, the three-table claim, CONVENTIONS, the webhook
+verifier, every other SHIPPED/OPEN_ASKS entry, and the ASCII diagram - held
+up on independent verification. Unlike Run 12's note speculating a fully
+clean read might be possible, this run's read was *not* fully clean - the
+backlog here, while clearly narrowing, has not actually run dry yet.
+
+### Fallback Task B sweep (per instructions, since Task C's per-run gaps
+were exhausted after the above) - one real finding, verified before fixing
+
+Dispatched one Explore sub-agent scoped to areas not covered by a *recent*
+close read: `src/app/api/juke/webhooks/route.ts` +
+`jukeWebhookHandlers.ts` read as the handler files themselves (prior runs
+mostly checked the *manifest's description* of them, not the files
+directly), the remaining `src/components/spaces/*.tsx` files (none left
+unchecked - confirmed via `ls`), `src/app/api/auth/session/route.ts` +
+`verify/route.ts`, the `viem` override's continued necessity (re-confirmed
+live via `npm ls`/`npm view` - still required), `vitest.config.ts`/
+`vitest.setup.ts`, and a repo-wide TODO/FIXME/STUB/"not yet" grep across
+`src/`, `docs/`, and top-level `*.md` (not just `src/`, to catch docs-only
+hits). It reported one finding, independently re-verified against the real
+code myself before fixing:
+
+1. **`src/app/api/juke/webhooks/route.ts`'s own docstring claimed "We always
+   return 200 once the signature passes, except for setup misconfiguration
+   (no secret) and signature failures."** False - read the route directly:
+   two more non-200 paths exist strictly after signature verification
+   succeeds - `JSON.parse(rawBody)` failure returns 400
+   (`route.ts:57-62`), and a `recordWebhookEvent` DB-insert failure returns
+   500 (`route.ts:66-78`). Only a *handler* error (after the event is
+   already persisted) is intentionally swallowed into 200, to avoid a Juke
+   retry storm on our own bug - that's the real invariant, and the old text
+   conflated it with "always 200 post-signature." Rewrote the docstring's
+   numbered behavior list to name all six response paths (401 no-secret,
+   401 bad-signature, 400 bad-JSON, 500 DB-insert-failure, 200 duplicate,
+   200 handler-ran) and replaced the closing summary sentence with the
+   actual invariant. Commit `cd56a29`.
+
+   Everything else the sub-agent checked came back clean on independent
+   verification: `jukeWebhookHandlers.ts`'s event-vocabulary docstring
+   (confirmed the undocumented `'room.ended'` switch-case alias is inert
+   defensive code, not a functional gap - `register-webhook/route.ts`'s
+   `EVENTS` array only ever subscribes Juke to the 5 documented events);
+   the remaining `src/components/spaces/*.tsx` files (all already covered
+   by a prior run's close read - no fresh ground); `session/route.ts` +
+   `verify/route.ts` (thin wrappers, status codes/fields cross-checked
+   against their one caller, `AdminLoginButton.tsx` - consistent); the
+   `viem` override (still necessary and correctly reasoned); `vitest.*`
+   config files (no stale comments, 94/94 still passing); and the wider
+   grep (nothing new in `docs/` or top-level `*.md` beyond what this file
+   already documents about itself).
+
+All of build, lint, typecheck, and test (94/94) pass clean as of the last
+commit this run. Pushed both commits to `origin/main`.
+
+### Explicitly not touched (confirmed blocked on someone outside this
+codebase - same three as every prior run)
+
+- `JUKE_USER_TOKEN` refresh flow
+- Recurring-event cron
+- Agent-in-Juke/ZOE auto-join (specifically the *unattended*/auto-join
+  piece - the underlying agent-join API call is now a documented SHIPPED
+  consumer as of this run; only the VPS-side session-token consumer remains
+  outside this sandbox)
+
+### For the next run
+
+- All 4 roadmap items remain in the same state Run 11/12 left them: items 1
+  and 3 done, item 2 blocked on a @thezao Farcaster signer credential, item
+  4's code-side gap fixed with the logo/favicon design asset itself still
+  the one open piece. None of these are engineering gaps left in this
+  sandbox's control - say so plainly rather than re-litigating items 1-3
+  from scratch every run.
+- `jukeIntegrationManifest.ts` has now yielded a genuinely new, real finding
+  on **eight** consecutive close reads (Runs 3, 7, 8, 9, 10, 11, 12, 13).
+  This run's finding was actually more substantial than Run 12's (a missing
+  SHIPPED entry plus a stale ask, not just one stale description) - a
+  reminder not to assume the trend toward "narrower findings" is monotonic.
+  Still worth another close read next run rather than assuming exhaustion,
+  though the well is visibly getting harder to draw from (two full
+  sub-agent sweeps this run each found exactly one thing).
+- The fallback Task B sweep found one real, narrow finding this run
+  (`webhooks/route.ts`'s docstring) after Run 12's sweep came back
+  completely clean - a reminder that "handler files themselves" and
+  "manifest's description of the handler files" are different audit
+  surfaces, and a clean read of one doesn't imply the other is clean too.
+- `getSupabaseBrowser` (`src/lib/db/supabase.ts`) is still real, working,
+  unused code - same note as Runs 8-12, still a product/scope call.
+- `zukeConfig.brandColor` is still defined with zero consumers - same note
+  as Runs 10-12, flagged in case future branding work wants it.
