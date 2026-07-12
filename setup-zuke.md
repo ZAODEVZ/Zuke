@@ -9,7 +9,6 @@ Follow these steps to provision and deploy Zuke.
 3. Run the migrations:
 
 ```bash
-npx tsx scripts/register-juke-webhook.ts  # If needed
 psql -U postgres -d zuke_db -f scripts/juke-spaces-migration.sql
 psql -U postgres -d zuke_db -f scripts/juke-spaces-migration-2.sql
 psql -U postgres -d zuke_db -f scripts/juke-spaces-migration-3.sql
@@ -44,7 +43,14 @@ NEYNAR_API_KEY=<optional-for-recap-pfp-enrichment>
 npx tsx scripts/register-juke-webhook.ts
 ```
 
-This will POST to Juke and save the webhook URL to `.env.local`.
+This POSTs to Juke and, on a fresh registration, writes the returned secret
+into `JUKE_WEBHOOK_SECRET` in `.env.local`. Safe to re-run: Juke dedupes by
+(app, url), and if the response doesn't include a new secret (subscription
+already existed) the script leaves your existing `.env.local` untouched
+rather than clobbering it. In production, use the admin route instead:
+`POST /api/juke/admin/register-webhook` (session must be admin), then copy
+`juke.secret` from the response into Vercel's env vars and redeploy - see
+that route's docstring for the exact flow.
 
 ## Step 5 - Deploy
 
