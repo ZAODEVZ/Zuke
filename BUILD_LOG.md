@@ -155,3 +155,95 @@ someone outside this codebase)
 - Haven't done a deep audit of `src/app/api/juke/admin/agent-join` or
   `src/app/api/recordings/*` routes yet - worth a read-through next run
   if Task A/B here are considered closed out.
+
+## Run 2 — 2026-07-12
+
+Read this file fully before starting (per instructions). Fast-forwarded
+local `main` to `origin/main` (HEAD had detached to Run 1's commit, no
+divergent work lost). Re-verified from a clean `npm install`:
+`npm run build`, `lint`, `typecheck`, `test` (94/94) all still pass clean
+- confirms the Run 1 toolchain fixes hold up on a fresh checkout.
+
+### Followed up on Run 1's "for next run" pointers
+
+- **`src/app/api/juke/admin/agent-join` route + `jukeAgentJoin.ts`**: read
+  both fully. Both are real, complete, correctly-gated implementations
+  (admin-auth checked, Juke's documented 404/429 semantics handled
+  explicitly, `isAutoAgentJoinEnabled()` correctly reads
+  `ZAO_AUTO_AGENT_JOIN`). This is the same surface as the
+  explicitly-blocked "Agent-in-Juke/ZOE auto-join" item - confirmed
+  blocked on ZOE's VPS-side readiness to consume session tokens, not an
+  engineering gap. Left untouched, as instructed.
+- **`src/app/api/recordings/*` routes**: dispatched a sub-agent to do a
+  full read-through of all four routes (`import-x`, `recap`, `snippet`,
+  `upload`) and their entire call chains
+  (`recordingsDb.ts`/`recordingsStorage.ts`/`xSpaces.ts`/`recordingParts.ts`/
+  the `recording.ready`/`room.finished` webhook handler cases), plus a
+  fresh TODO/FIXME/stub/XXX/HACK grep across `src/` and a README roadmap
+  re-check. **Verified result: the recordings pipeline itself has no
+  gaps** - docstrings match implementation, error handling is real
+  (idempotent `23505` handling, graceful degradation when migration #4
+  isn't applied), no stubs disguised as working code. The only
+  grep-sweep hits are the HMS provider (`providers/hms.ts`), which is
+  already honestly self-labeled `STUB`/`TODO(hms-port)` and correctly
+  throws `not implemented yet` rather than silently misrouting - not a
+  new finding.
+
+### Found and fixed: `setup-zuke.md` was actively wrong, not just stale
+
+Verified each claim myself against real code before touching anything
+(per instructions - do not trust a sub-agent's report blindly either):
+
+1. Verification section told a deployer to visit `/zuke-status` (does
+   not exist anywhere under `src/app` - confirmed via search; the real
+   page is `/juke-status`, `src/app/juke-status/page.tsx`), gated by "the
+   admin password cookie" (that page's own metadata says it's a public
+   dashboard - no auth check in the file), and to click a "Create Test
+   Space" button that doesn't exist anywhere in the codebase (grepped,
+   zero hits). Real room creation is at `/live/create`.
+2. Step 3's env var list is missing `SESSION_SECRET` and
+   `ZUKE_ADMIN_FIDS`. Confirmed in `src/lib/auth/session.ts:24-27`:
+   `sessionOptions()` unconditionally throws
+   `'SESSION_SECRET must be set and at least 32 characters'` whenever
+   the legacy `zuke_admin` password cookie isn't present, and that path
+   is hit by nearly every route (`getSessionData()` is called broadly,
+   including by the recordings routes). A deployer following the doc
+   literally - setting only the vars it listed - gets a broken app for
+   any user going through the now-live SIWF flow. `ZUKE_ADMIN_FIDS`
+   (`src/lib/auth/session.ts:86,96`) gates who actually gets `isAdmin`
+   on that path and was likewise missing.
+3. Both `README.md` and `setup-zuke.md` pointed deployers at
+   `.env.example` for the full env var list; that file was never
+   committed (`.gitignore:34` excludes all `.env*`, no exception carved
+   out for it) and doesn't exist in the repo. Fixed both docs to stop
+   referencing it and point at `setup-zuke.md` Step 3 directly, with the
+   two missing vars added.
+4. `setup-zuke.md`'s "v1 Roadmap" still listed "Replace admin password
+   with Farcaster SIWN" as outstanding - already done and documented
+   correctly elsewhere (README, per Run 1). Removed the stale line.
+
+All four fixes were pure documentation edits (`setup-zuke.md`,
+`README.md`) - no code changed, so `npm run lint` / `npm run typecheck`
+were re-run as a sanity check (both clean) but there was nothing for
+`build`/`test` to regress. Committed and pushed as `36179ff`.
+
+### Explicitly not touched (confirmed blocked on someone outside this
+codebase - same three as every prior run)
+
+- `JUKE_USER_TOKEN` refresh flow
+- Recurring-event cron
+- Agent-in-Juke/ZOE auto-join
+
+### For the next run
+
+- Toolchain (`install`/`build`/`lint`/`typecheck`/`test`) and the
+  recordings pipeline are both now confirmed clean/accurate as of this
+  run - no need to re-audit either from scratch unless something in the
+  repo actually changes.
+- Docs (`README.md`, `setup-zuke.md`) should now match reality. Worth a
+  final skim of `docs/recap.md` next run - it's referenced by
+  `setup-zuke.md` Step 1 but hasn't been checked against
+  `src/lib/spaces/recordings.ts`/`recordingParts.ts` yet.
+- Recap-cast auto-posting is still a stub blocked on a @thezao Farcaster
+  signer credential (not one of the three explicitly-excluded items, but
+  same category: needs external provisioning, not code).
