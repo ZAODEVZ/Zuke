@@ -31,8 +31,10 @@ function constantTimeEqual(a: string, b: string): boolean {
  * fractal call, COC Concertz nights); this route mints a Juke space for one
  * of them on demand and returns the space id to embed at `/live/{id}`.
  *
- * The `JUKE_API_KEY` + `JUKE_USER_TOKEN` secrets stay server-side. Until both
- * are configured (apply at juke.audio/developers), the route reports 503
+ * The `JUKE_API_KEY` secret stays server-side (key-only auth per
+ * juke-api.ts's own docstring — `JUKE_USER_TOKEN` is a stale bearer-auth
+ * path Juke has since superseded and is not read here). Until it's
+ * configured (apply at juke.audio/developers), the route reports 503
  * rather than failing opaquely — Path A, the keyless iframe embed, keeps
  * working regardless.
  */
@@ -108,10 +110,13 @@ export async function POST(request: NextRequest) {
       // Upstream Juke failure. Log the real status server-side; report a
       // single 502 to the client — a Juke 401/400 is an integration problem,
       // not a signal the ZAO caller is unauthenticated or sent a bad body.
+      // 503 is carved out: it means "JUKE_API_KEY isn't configured" (see
+      // providers/juke.ts), a distinct Zuke-side condition the docstring
+      // above promises stays a 503, not an upstream failure to fold into 502.
       logger.error('[juke/space] provider.createRoom failed:', result.status, result.error);
       return NextResponse.json(
         { success: false, error: result.error },
-        { status: result.status >= 500 ? 502 : result.status },
+        { status: result.status === 503 ? 503 : result.status >= 500 ? 502 : result.status },
       );
     }
 
