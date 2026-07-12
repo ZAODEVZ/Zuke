@@ -20,16 +20,20 @@ import { getBaseUrl } from '@/zuke.config';
  *
  * Admin-only. Idempotent in practice: Juke caps webhook subs at max 5 per app
  * + uniques by (app_id, url), so re-running with the same URL returns the
- * existing subscription rather than duplicating.
+ * existing subscription rather than duplicating. Whether that re-run response
+ * includes a fresh `secret` is not documented, so this route branches on
+ * whatever Juke actually sends back: `status: "created"` when a secret is
+ * present, `status: "already_registered"` when it isn't (nothing to copy -
+ * an existing subscription already covers this URL).
  *
  * Body (optional):
  *   { url?: string }   defaults to `${getBaseUrl()}/api/juke/webhooks`
  *
  * Response:
- *   201 + { ok: true, juke: <Juke response incl. generated secret>, action_required: "..." }
+ *   201 + { ok: true, status: "created" | "already_registered", juke: <Juke response>, action_required: "..." }
  *   401 if not admin
  *   503 if JUKE_API_KEY is unset
- *   502 if Juke rejects
+ *   502 if Juke rejects (juke_status carries the upstream status code)
  */
 
 const BodySchema = z.object({
@@ -96,7 +100,7 @@ export async function POST(request: NextRequest) {
     if (!res.ok) {
       logger.error('[juke/admin/register-webhook] Juke rejected', res.status, jukeBody);
       return NextResponse.json(
-        { ok: false, error: `Juke returned ${res.status}`, juke: jukeBody },
+        { ok: false, error: `Juke returned ${res.status}`, juke_status: res.status, juke: jukeBody },
         { status: 502 },
       );
     }
@@ -109,16 +113,26 @@ export async function POST(request: NextRequest) {
       if ('secret' in clone) clone.secret = '<redacted>';
       return clone;
     })();
-    logger.info('[juke/admin/register-webhook] registered', { url, juke: safeForLog });
+    const returnedSecret =
+      typeof jukeBody === 'object' && jukeBody !== null && 'secret' in jukeBody
+        ? (jukeBody as { secret?: unknown }).secret
+        : undefined;
+    const status = typeof returnedSecret === 'string' && returnedSecret.length > 0
+      ? ('created' as const)
+      : ('already_registered' as const);
+    logger.info('[juke/admin/register-webhook] registered', { url, status, juke: safeForLog });
 
     return NextResponse.json(
       {
         ok: true,
+        status,
         url,
         events: EVENTS,
         juke: jukeBody,
         action_required:
-          'COPY the value of juke.secret into JUKE_WEBHOOK_SECRET on Vercel (Production + Preview + Development), then redeploy. The webhook receiver verifies every inbound delivery against this secret; without it every delivery 401s. Then close this tab - do not leave the secret on screen.',
+          status === 'created'
+            ? 'COPY the value of juke.secret into JUKE_WEBHOOK_SECRET on Vercel (Production + Preview + Development), then redeploy. The webhook receiver verifies every inbound delivery against this secret; without it every delivery 401s. Then close this tab - do not leave the secret on screen.'
+            : 'No action needed - a webhook subscription for this URL already exists on Juke and no new secret was issued. If deliveries are currently 401ing (JUKE_WEBHOOK_SECRET missing or stale), delete the existing subscription via /api/juke/admin/delete-webhook and re-run this registration to get a fresh secret.',
       },
       { status: 201 },
     );
