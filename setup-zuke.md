@@ -114,5 +114,9 @@ vercel --prod
 ## v1 Roadmap
 
 - Integrate ZAO signer for auto-casting to @thezao
-- Custom domain: zuke.thezao.com
 - Branding: Zuke identity + logo
+
+Custom domain (`zuke.thezao.com`) shipped and verified live in production -
+removed from this list. `getBaseUrl()` (`src/zuke.config.ts`) and every
+consumer already resolve to it consistently; see `NEXT_PUBLIC_SITE_URL`
+above if you need to pin the value explicitly.
