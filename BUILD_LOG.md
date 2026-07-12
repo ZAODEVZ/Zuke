@@ -2431,3 +2431,184 @@ codebase - same three as every prior run)
   unused code - same note as Runs 8-16, still a product/scope call.
 - `zukeConfig.brandColor` is still defined with zero consumers - same note
   as Runs 10-16, flagged in case future branding work wants it.
+
+## Run 18 — 2026-07-12
+
+Read this file fully before starting. Local `main`/`origin/main` had
+diverged in an unusual way this run: local `main` pointed at an entirely
+unrelated history (`git merge-base --is-ancestor` returned false despite
+matching final commit messages) rather than the usual simple
+detached-HEAD-behind-origin pattern of Runs 2-17. Diagnosed before acting:
+this was a stale local branch ref artifact of this sandbox's setup, not
+real divergent work (`git status` was clean, no uncommitted changes
+anywhere). Fixed with `git checkout -B main origin/main` rather than a
+merge, since there was nothing local to preserve. Re-verified from a
+clean `npm install` (removed `node_modules` first): `build`, `lint`,
+`typecheck`, `test` (94/94) all pass clean before touching anything.
+
+### Task A - still correctly ruled out (Run 1). Not re-investigated this
+run; nothing prompted a re-check.
+
+### Task C - re-verified all 4 roadmap items directly against current
+code; no change in status on any of them
+
+1. **Item 1 (SIWN)** - re-grepped every `ZUKE_ADMIN_PASSWORD` consumer in
+   `src/`: still exactly `session.ts:48-53`'s explicitly opt-in legacy
+   fallback block, unchanged. No change.
+2. **Item 2 (signer)** - re-read `src/lib/publish/auto-cast.ts` in full:
+   still an unconditional stub (logs, returns `null`), still zero real
+   signer-credential references anywhere in `src/`. Confirmed still
+   blocked on a @thezao Farcaster signer this sandbox cannot provision or
+   fake. No change.
+3. **Item 3 (custom domain)** - `setup-zuke.md`'s roadmap section still
+   correctly lists only the two open items (signer, branding), with the
+   shipped-note intact. Re-ran a repo-wide grep for `zaoos.com`/`localhost`
+   in `src/`: zero non-test hits. `zuke.config.ts`'s `getBaseUrl()` still
+   accurately describes the live custom-domain resolution order. No change
+   needed.
+4. **Item 4 (branding)** - re-checked `public/` (still only the five
+   unmodified create-next-app SVGs) and `src/app/favicon.ico` (md5
+   `c30c7d42707a47a3f4591831641e50dc`, byte-identical to Runs 10-17's
+   check - still the stock create-next-app default) and grepped product
+   surfaces for stray "ZAO" mislabeling (only legitimate references to
+   "the ZAO team"/org remain). **No new code-side gap; the logo/favicon
+   asset is still the one documented missing piece, still needs a
+   human-provided design asset.**
+
+Also independently confirmed `README.md` has no stale duplicate roadmap
+(it dropped its own roadmap section entirely per Run 6 - only
+`setup-zuke.md` carries one now) and its Architecture section's SIWF/
+auto-cast-stub prose still matches current code exactly.
+
+All 4 roadmap items remain exactly where Runs 11-17 left them: items 1
+and 3 done, item 2 blocked on an external credential, item 4's code-side
+gap already fixed with the design-asset gap itself still real and outside
+this sandbox's control.
+
+### Skipped the dedicated `jukeIntegrationManifest.ts` close-read sub-agent
+this run, per Run 17's explicit recommendation
+
+Run 17 was the file's first fully clean read after twelve consecutive
+reads (Runs 3, 7-16) each found something, and recommended redirecting
+sub-agent budget toward fresh territory instead of a guaranteed-diminishing
+close read every single run unless a change touches code the manifest
+describes. No commit this run touched webhook handlers, the provider
+registry, create-space fields, or admin routes, so no targeted grep-check
+was needed either.
+
+### Fallback Task B sweep - dispatched into genuinely fresh territory
+(config/toolchain files, not the app/docs surface 17 prior runs have
+repeatedly covered) - three real, verified findings, all fixed; one
+investigated and correctly not acted on
+
+Dispatched one Explore sub-agent scoped to `vitest.config.ts`/
+`vitest.setup.ts`, `package.json` in full (deps, scripts, overrides),
+`tsconfig.json`, `eslint.config.mjs`, `.github/workflows/
+juke-stale-rooms-cron.yml`'s actual YAML, `next.config.ts`, `.gitignore`,
+`CLAUDE.md`/`AGENTS.md`, and `package.json`'s `name` field - areas no
+prior run's build-log entry named as checked. Most of this checked out
+clean (vitest/tsconfig alias parity, the GitHub Actions workflow matching
+`route.ts` and setup-zuke.md exactly, `.gitignore`'s `.env*` claim,
+`next.config.ts` still an empty stub). Four items were flagged; I
+independently re-verified each against real code myself before acting,
+per instructions:
+
+1. **`@neynar/nodejs-sdk` was a fully unused dependency.** Confirmed via
+   repo-wide grep (`src/`, `scripts/`) - zero imports anywhere. All real
+   Neynar integration is raw `fetch()` REST calls per `neynar.ts`'s own
+   doc comment ("Direct REST (no SDK coupling)"). Removed it, ran a clean
+   `npm install`, and re-verified `build`/`lint`/`typecheck`/`test`
+   (94/94) all still pass. Also checked whether this affected the `viem`
+   override's necessity (the sub-agent flagged `@neynar/nodejs-sdk` as one
+   of two packages constraining `viem` in the lockfile) - read
+   `@farcaster/auth-client`'s own `package.json` directly
+   (`viem: ^2.29.2`) and confirmed the override is still required
+   regardless: Run 1's original finding was that the *published*
+   `viem@2.51.0` itself points its `ox` dependency at a broken
+   ephemeral pre-release build, unrelated to which consumer requests
+   viem. Left the override in place. Commit `e4ad893`.
+2. **`tsx` was invoked via bare `npx` in `setup-zuke.md` and two
+   `scripts/*.ts` docstrings but was never a declared dependency
+   anywhere** - not in `package.json`, not actually installed in
+   `package-lock.json` (only a never-installed optional peerDependency of
+   `vite`, itself pulled in transitively by `vitest`). Every documented
+   `npx tsx ...` invocation was silently fetching `tsx` ad hoc from the
+   registry at runtime instead of resolving a pinned local copy, unlike
+   `vitest`, which properly backs the documented `npm run test`. Added
+   `tsx` as a devDependency (latest published, `^4.23.0`, verified via
+   `npm view tsx version`), confirmed `node_modules/.bin/tsx` now resolves
+   and `npx tsx --version` works locally without a network fetch, and
+   re-verified the full toolchain (94/94 tests). Commit `66c7d42`.
+3. **`package.json`'s `name` field was still the untouched create-next-app
+   boilerplate `"zuke-init"`.** Confirmed via `git log -- package.json`
+   that no prior commit ever touched it (Run 9's branding fix was root
+   layout `<title>`/`<meta>` only). Nothing in the repo reads this field
+   externally (package is `private: true`), so this is cosmetic, but it's
+   exactly the kind of leftover scaffolding this run's own Task C item 4
+   re-check was looking for. Renamed to `"zuke"`, ran `npm install` to
+   sync `package-lock.json`'s mirrored name fields, re-verified the full
+   toolchain (94/94 tests, `zuke@0.1.0` now shown in script output).
+   Commit `606a156`.
+4. **Investigated, not a finding: `AGENTS.md`'s directive to read
+   `node_modules/next/dist/docs/` "before writing any code."** The
+   sub-agent flagged this as security-relevant because several bundled
+   doc files contain repeated `{/* AI agent hint: ... */}` comments
+   pushing toward exporting an experimental `unstable_instant` route flag.
+   Read the actual content directly before treating this as a possible
+   prompt-injection concern (per this project's standing instruction to
+   flag suspected injection): `node_modules/next/dist/docs/01-app/
+   02-guides/ai-agents.md` documents this exact bundled-docs-plus-inline-
+   agent-hints mechanism as an official, intentional Next.js 16.2+ feature
+   (ships with `create-next-app`, generates the same `AGENTS.md`
+   `@`-import pattern this repo already has), and `instant-navigation.md`
+   documents `unstable_instant` as a real, legitimate opt-in experimental
+   API for validating Suspense-boundary placement, not something covert
+   or harmful. Concluded this is genuine (if unusually assertive in tone)
+   framework documentation, not an attack - did not act on the hint (no
+   task this run touched navigation/caching code, and it was never
+   requested), and did not escalate further since there's no actual
+   security concern, just an unusual but legitimate framework feature
+   worth this note for any future run that does touch routing/caching
+   code and wonders where the `unstable_instant` hints keep coming from.
+
+All of build, lint, typecheck, and test (94/94) pass clean as of the last
+commit this run. Pushed all three commits to `origin/main`.
+
+### Explicitly not touched (confirmed blocked on someone outside this
+codebase - same three as every prior run)
+
+- `JUKE_USER_TOKEN` refresh flow
+- Recurring-event cron
+- Agent-in-Juke/ZOE auto-join (specifically the *unattended*/auto-join
+  piece - unchanged since Run 13, still blocked on both the VPS-side
+  session-token consumer and `allow_agents` not being exposed on the real
+  create path, per Run 16)
+
+### For the next run
+
+- All 4 roadmap items remain in the same state Runs 11-17 left them: items
+  1 and 3 done, item 2 blocked on a @thezao Farcaster signer credential,
+  item 4's code-side gap fixed with the logo/favicon design asset itself
+  still the one open piece. None of these are engineering gaps left in
+  this sandbox's control - say so plainly rather than re-litigating items
+  1-3 from scratch every run.
+- `jukeIntegrationManifest.ts`'s dedicated close-read sub-agent is still
+  correctly paused per Run 17's recommendation - resume it only if a
+  future commit touches webhook handlers, the provider registry,
+  create-space fields, or admin routes (do a targeted grep-check of the
+  manifest's corresponding claim first), or once enough runs have passed
+  that a fresh full read is cheap insurance again.
+- This run found real gaps by deliberately searching *config/toolchain*
+  files (`package.json`, devDependency completeness) rather than
+  re-reading app code/docs a dozen prior runs have already covered -
+  worth continuing to rotate the fallback sweep's scope toward
+  genuinely-unread file categories (build config, CI, lockfile hygiene)
+  rather than re-treading `src/app`/`src/lib/spaces` by default, now that
+  those are comparatively well-trodden.
+- The two adjacent product questions from Run 16/17 (`allowAgents`
+  default, `record` default on `/live/create`) still need a human
+  decision, not invented code - unchanged this run.
+- `getSupabaseBrowser` (`src/lib/db/supabase.ts`) is still real, working,
+  unused code - same note as Runs 8-17, still a product/scope call.
+- `zukeConfig.brandColor` is still defined with zero consumers - same note
+  as Runs 10-17, flagged in case future branding work wants it.
