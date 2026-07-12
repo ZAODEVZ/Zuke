@@ -70,9 +70,10 @@ export function buildResolutionIndex(
     // 2) Implicit join: an OpenAsk.id matches the entry.id directly. Lets a
     // newly-shipped Juke entry resolve our ask without needing Nicky to
     // backfill the resolves[] array. Pre-condition is identical ids on both
-    // sides - which is exactly how we author asks for new Juke features
-    // (e.g. our 'developer-end-space' ask matches Juke's 'developer-end-space'
-    // changelog entry). resolves[] still wins for explicit cross-id mappings.
+    // sides - which is exactly how we author asks for new Juke features (our
+    // now-resolved-and-removed 'developer-end-space' ask matched Juke's
+    // identically-named changelog entry this way). resolves[] still wins for
+    // explicit cross-id mappings.
     const idMatch = out.get(entry.id);
     if (!idMatch || entry.shipped_at > idMatch.shipped_at) {
       out.set(entry.id, entry);

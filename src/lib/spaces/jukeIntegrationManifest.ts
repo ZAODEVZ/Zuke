@@ -150,7 +150,7 @@ const SHIPPED: ShippedFeature[] = [
     id: 'public-status-surfaces',
     title: 'Public build-status surfaces for the Juke team',
     description:
-      'Three mirrors of this manifest: /juke-status (HTML dashboard with live stats + architecture diagram), /api/juke/status (JSON, CORS open, X-ZAO-Juke-Status: v1 header), /juke-integration.md (llms.txt-style markdown). Single source of truth in jukeIntegrationManifest.ts.',
+      'Three mirrors of this manifest: /juke-status (HTML dashboard with live stats + architecture diagram), /api/juke/status (JSON, CORS open, X-ZAO-Juke-Status: v3 header), /juke-integration.md (llms.txt-style markdown, X-ZAO-Juke-Status: v2 header). Single source of truth in jukeIntegrationManifest.ts.',
     shippedAt: '2026-05-23',
     files: [
       'src/lib/spaces/jukeIntegrationManifest.ts',
