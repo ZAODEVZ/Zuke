@@ -8,15 +8,17 @@ import { isValidJukeSpaceId } from '@/lib/spaces/juke';
 /**
  * POST /api/juke/admin/mark-ended
  *
- * Manual override that flips a Juke space row to `status: 'ended'` in our DB,
- * decoupled from the Juke `room.finished` webhook. Required today because the
- * Juke iframe Leave button is a pure LiveKit `room.disconnect()` and does not
- * trigger an end on Juke's side; rooms we create via the developer API only
- * really end when (a) Juke's developer end-space endpoint is called (no spec
- * for that yet, blocked on Nicky) or (b) Juke times the room out internally.
- *
- * Without this route, /spaces shows "test4" as Live for hours after the host
- * walked away. This bridges the gap.
+ * Manual, local-only override that flips a Juke space row to
+ * `status: 'ended'` in our DB, decoupled from the Juke `room.finished`
+ * webhook and without calling out to Juke at all. Juke's developer
+ * end-space endpoint (POST /v1/developer/spaces/{id}/end, Nicky's PR #174,
+ * shipped 2026-05-24) is what `/api/juke/admin/end-space` calls, and that
+ * route already handles its own 404 fallback by flipping the row inline -
+ * so this route is not on that primary path. It stays as a standalone
+ * escape hatch for cases where hitting Juke's API isn't possible or wanted
+ * at all (e.g. Juke is unreachable, not just 404ing) and for the Juke
+ * iframe Leave button, which is a pure LiveKit `room.disconnect()` and
+ * never calls end-space in the first place.
  *
  * Admin OR original host (created_by_fid === session.fid) can mark a space
  * ended. The row is updated in-place; if a real `room.finished` webhook
