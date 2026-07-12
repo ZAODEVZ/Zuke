@@ -277,8 +277,10 @@ export async function applyWebhookEvent(
         }
       }
 
-      // Best-effort recap cast - autoCastToZao silently no-ops if the
-      // @thezao signer is not configured, so this is safe on local + preview.
+      // Best-effort recap cast - autoCastToZao is currently a stub (no
+      // @thezao signer wired up yet; see src/lib/publish/auto-cast.ts), so
+      // this always no-ops for now. Call stays in place so casting goes live
+      // the moment that function has a real implementation.
       try {
         const row = await getJukeSpace(spaceId);
         const title = row?.title ?? 'A ZAO space';

@@ -140,9 +140,9 @@ const SHIPPED: ShippedFeature[] = [
   },
   {
     id: 'recap-cast',
-    title: 'Auto-cast on recording.ready',
+    title: 'Auto-cast on recording.ready (wiring shipped, posting not yet live)',
     description:
-      'After persisting recording_url, the webhook handler posts a recap cast to /zao via the @thezao official account, embedding the Juke /live/{id} URL so the Juke OG image renders in the cast preview. Silently no-ops when the @thezao signer env is missing.',
+      'After persisting recording_url, the webhook handler calls autoCastToZao with a recap cast to /zao, embedding the Juke /live/{id} URL so the Juke OG image renders in the cast preview. In the Zuke repo autoCastToZao (src/lib/publish/auto-cast.ts) is currently a stub - no @thezao Farcaster signer credential is provisioned yet, so it logs and no-ops rather than actually posting. The call site is wired and ready; only the signer credential is missing.',
     shippedAt: '2026-05-23',
     files: ['src/lib/spaces/jukeWebhookHandlers.ts', 'src/lib/publish/auto-cast.ts'],
   },
@@ -247,9 +247,9 @@ const SHIPPED: ShippedFeature[] = [
   },
   {
     id: 'recap-cast-room-finished',
-    title: 'Recap cast on room.finished (ended_via host/api only)',
+    title: 'Recap cast on room.finished (ended_via host/api only; wiring shipped, posting not yet live)',
     description:
-      "When a Juke space ends with ended_via in {host, api}, the webhook handler auto-casts a 'Just wrapped: {title}' message to /zao from @thezao via autoCastToZao. Embeds the /live/{id} URL so Farcaster unfurls the OG card. Skips silent idle-timeouts (ended_via=null) since there's nobody to recap to. The recording.ready handler still fires its own 'Recording up' follow-up cast independently when a recording is on - two-cast pattern is intentional so listeners get a re-engagement ping when the file lands.",
+      "When a Juke space ends with ended_via in {host, api}, the webhook handler calls autoCastToZao with a 'Just wrapped: {title}' message for /zao, embedding the /live/{id} URL so Farcaster would unfurl the OG card. Skips silent idle-timeouts (ended_via=null) since there's nobody to recap to. Same caveat as recap-cast: autoCastToZao is a stub in the Zuke repo pending a @thezao signer credential, so no cast is actually posted yet. The recording.ready handler still fires its own 'Recording up' follow-up call independently when a recording is on - two-cast pattern is intentional so listeners get a re-engagement ping when the file lands, once casting is live.",
     shippedAt: '2026-05-25',
     files: ['src/lib/spaces/jukeWebhookHandlers.ts'],
     reference: 'Branches on Nicky 2026-05-24 ended_via payload addition.',
