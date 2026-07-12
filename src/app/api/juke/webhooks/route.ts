@@ -21,12 +21,15 @@ import { verifyJukeWebhook } from '@/lib/spaces/jukeWebhookVerify';
  * Behaviour:
  *   1. 401 if JUKE_WEBHOOK_SECRET is unset (refuse all inbound until paired).
  *   2. 401 on signature mismatch or timestamp outside the 5-min replay window.
- *   3. 200 + early ack on duplicate signature (idempotent replay).
- *   4. 200 after handler runs; failures are logged + persisted but NOT
+ *   3. 400 if the signature passes but the body isn't valid JSON.
+ *   4. 500 if recordWebhookEvent (the DB insert) throws.
+ *   5. 200 + early ack on duplicate signature (idempotent replay).
+ *   6. 200 after handler runs; failures are logged + persisted but NOT
  *      reflected as a 5xx (Juke would retry forever on a handler bug).
  *
- * We always return 200 once the signature passes, except for setup
- * misconfiguration (no secret) and signature failures.
+ * Once the signature passes, we still surface 400/500 for malformed bodies
+ * or DB failures (both worth a Juke retry) - only a *handler* bug is
+ * swallowed into a 200, since that's a bug on our side retries can't fix.
  */
 export async function POST(request: NextRequest) {
   const secret = ENV.JUKE_WEBHOOK_SECRET;
