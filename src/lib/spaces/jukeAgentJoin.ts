@@ -1,8 +1,11 @@
 /**
- * Thin helper to call Juke's free partner-scoped agent-join endpoint. Shared
- * by the admin route (`POST /api/juke/admin/agent-join`) and the optional
- * auto-join hook that fires on `room.started` webhooks (off by default, gated
- * by `ZAO_AUTO_AGENT_JOIN=true`).
+ * Thin helper to call Juke's free partner-scoped agent-join endpoint. Used by
+ * the optional auto-join hook that fires on `room.started` webhooks (off by
+ * default, gated by `ZAO_AUTO_AGENT_JOIN=true`). `POST
+ * /api/juke/admin/agent-join` does NOT call this helper - it has its own
+ * independent inline `fetch` to the same Juke endpoint, with its own status
+ * mapping. Two implementations of the same call exist in this repo, not one
+ * shared helper.
  *
  * Returns the session_token on success. Caller decides whether to persist it
  * (the token is short-lived + tied to the room, so storing long-term has no
