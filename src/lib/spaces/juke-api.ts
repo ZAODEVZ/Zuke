@@ -121,8 +121,8 @@ export function extractSpaceId(payload: unknown): string | null {
  * Create a Juke space through the developer API.
  *
  * @param input       The space to create.
- * @param credentials The `JUKE_API_KEY` + `JUKE_USER_TOKEN` pair, passed in by
- *                    the caller — this module never reads them from the
+ * @param credentials The `JUKE_API_KEY` (key-only per llms.txt), passed in by
+ *                    the caller — this module never reads it from the
  *                    environment itself.
  * @returns A {@link CreateJukeSpaceResult}. This function does not throw:
  *          network, timeout, and parse failures are returned as
