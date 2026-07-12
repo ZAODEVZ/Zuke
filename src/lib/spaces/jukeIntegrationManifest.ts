@@ -189,7 +189,7 @@ const SHIPPED: ShippedFeature[] = [
     id: 'juke-status-richer',
     title: 'Richer /juke-status: recent webhooks + recent spaces + code examples',
     description:
-      "Three new sections on the public dashboard. (1) Recent webhooks - last 15 events with type / space_id / age / processed-vs-failed pill. (2) Recent spaces - last 10 juke_spaces rows with status pill + time marker + participant count + recording link. (3) Code examples - 4 reference snippets matching production (create-space, embed, webhook verify, subscribe). Plus OG + Twitter card meta on the page itself, and recent_spaces + recent_events arrays added to /api/juke/status and /juke-integration.md.",
+      "Three new sections on the public dashboard. (1) Recent webhooks - up to 8 events shown (of the 15 fetched; the fuller 15-row list is what /api/juke/status and /juke-integration.md return) with type / space_id / age / processed-vs-failed pill. (2) Recent spaces - up to 6 rows shown (of the 10 fetched, same JSON/markdown-vs-page split) with status pill + time marker + participant count + recording link. (3) Code examples - 4 reference snippets matching production (create-space, embed, webhook verify, subscribe). Plus OG + Twitter card meta on the page itself, and recent_spaces + recent_events arrays added to /api/juke/status and /juke-integration.md.",
     shippedAt: '2026-05-24',
     pr: 'https://github.com/bettercallzaal/ZAOOS/pull/668',
     files: [
@@ -389,7 +389,8 @@ export const INTEGRATION_ARCHITECTURE_ASCII = String.raw`
          -> POST api.juke.audio/v1/developer/spaces
             X-Juke-Api-Key only (room owner = app.owner_fid)
          -> juke_spaces.insert
-         -> redirect to /live/{spaceId}
+         -> page shows the /live/{spaceId} link to copy or open
+            (no auto-redirect - the user clicks "Open space")
 
   AGENT READ PATH (Nicky's agent):
     AGENT -> GET zuke.thezao.com/api/juke/status (JSON)
