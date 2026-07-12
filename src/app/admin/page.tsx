@@ -1,9 +1,16 @@
+import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { getSessionData } from '@/lib/auth/session';
+import { zukeConfig } from '@/zuke.config';
 import { AdminConsole } from './AdminConsole';
 
 export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = {
+  title: `Admin - ${zukeConfig.name}`,
+  robots: { index: false },
+};
 
 export default async function AdminPage() {
   const session = await getSessionData();
