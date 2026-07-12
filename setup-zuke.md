@@ -40,6 +40,7 @@ ZUKE_ADMIN_FIDS=<comma-separated-farcaster-fids-allowed-as-admin>
 ZUKE_ADMIN_PASSWORD=<optional-legacy-admin-cookie-fallback>
 NEYNAR_API_KEY=<optional-for-recap-pfp-enrichment>
 CRON_SECRET=<random-string-shared-with-the-GitHub-Actions-workflow>
+NEXT_PUBLIC_OPTIMISM_RPC_URL=<optional-custom-optimism-rpc-for-siwf-verify>
 ```
 
 `SESSION_SECRET` and `ZUKE_ADMIN_FIDS` are required for the live SIWF admin
@@ -61,7 +62,10 @@ secret** (Settings -> Secrets and variables -> Actions), alongside a
 `.github/workflows/juke-stale-rooms-cron.yml` is what actually calls this
 route every 30 minutes - Vercel Cron isn't available on the Hobby tier.
 Without both repo secrets set, the workflow runs but every call 401s and
-stale rooms never get swept.
+stale rooms never get swept. `NEXT_PUBLIC_OPTIMISM_RPC_URL` is optional -
+it configures the RPC endpoint `/api/auth/verify` uses to check SIWF
+signatures (`src/lib/env.ts`); unset, it falls back to a public Optimism
+RPC (`https://optimism-rpc.publicnode.com`).
 
 ## Step 4 - Register Webhook
 
