@@ -982,3 +982,113 @@ codebase - same three as every prior run)
   whether to keep it (something client-side is expected to use it later)
   or remove it as dead code - that's a product/scope call, not something
   to force blind from this sandbox.
+
+## Run 9 — 2026-07-12
+
+Read this file fully before starting. Local `main` had detached again (same
+recurring pattern as every prior run) - fast-forwarded to `origin/main` (33
+commits). Re-verified from a clean `npm install`: `build`, `lint`,
+`typecheck`, `test` (94/94) all pass clean before touching anything.
+
+### Task A - still correctly ruled out (Run 1). Re-verified
+`juke-api-reads.ts` directly this run: still only GET-by-id and DELETE-by-id
+for webhooks, no list-by-URL endpoint. Also re-read
+`register-webhook/route.ts` end-to-end (the idempotency status field Run 1
+added) - still correct and consistent with `setup-zuke.md` and
+`scripts/register-juke-webhook.ts`. Nothing has changed since Run 1's
+writeup.
+
+### Task B
+
+Fresh TODO/FIXME/stub grep across `src/` turned up nothing new (same
+honestly-labeled `hms.ts` stub as every prior run). Spot-checked several
+previously-fixed areas held up: `/spaces` dead-route cleanup (Run 8) still
+clean, env var cross-check (`env.ts`'s 10 vars + `CRON_SECRET` all present in
+`setup-zuke.md`) still clean, `.github/workflows/juke-stale-rooms-cron.yml`
+still matches `setup-zuke.md`'s claims about it exactly, `docs/recap.md`
+still matches `recap/route.ts`, `README.md`'s `scripts/` directory
+description still matches what's actually in `scripts/`.
+
+Did a fresh close read of `jukeIntegrationManifest.ts` end-to-end again (per
+Run 8's pointer that this file has yielded a genuinely new finding on every
+one of its last three close reads - Runs 3, 7, 8) and found one more:
+
+1. **`public-status-surfaces` SHIPPED entry claimed `/api/juke/status` sends
+   `X-ZAO-Juke-Status: v1`.** Verified directly against
+   `src/app/api/juke/status/route.ts:51` - it actually sends `v3`. The
+   manifest also never mentioned `/juke-integration.md`'s header at all,
+   which is `v2` (`src/app/juke-integration.md/route.ts:104`) - a third,
+   different value on the file the manifest claims is this one's own mirror.
+   Fixed the description to state both real values instead of the one wrong
+   one. While there, also fixed a related but distinct issue in
+   `jukeChangelog.ts`'s `buildResolutionIndex` inline comment: its example of
+   the implicit-id-join mechanism cited `'developer-end-space'` as a live ask
+   being matched - but that ask was resolved and removed from `OPEN_ASKS` by
+   Run 3, so the example read as a current case when it's now historical.
+   Reworded to say so. Commit `8b80c9d`.
+
+2. **Dispatched one Explore sub-agent** to sweep `src/app/juke-status/page.tsx`
+   end-to-end, `jukeSpacesDb.ts`'s `getJukeIntegrationStats` /
+   `listRecentJukeSpaces` / `listRecentWebhookEvents`, and
+   `jukeChangelog.ts`'s `buildResolutionIndex` logic specifically (the one
+   piece of that file not yet individually checked past its fetch/cache
+   behavior). It reported two findings; both independently re-verified
+   against the real code before fixing, per instructions:
+
+   - **`juke-status/page.tsx`'s webhook-timeline empty-state copy said "the
+     most recent 15 events show up here"** - but `page.tsx:155` only ever
+     passes `recentEvents.slice(0, 8)` into that section, so at most 8 will
+     ever render there once Juke starts posting, not 15. (Confirmed the "15"
+     itself isn't wrong in isolation - `listRecentWebhookEvents(15)` does
+     fetch 15 rows, and both the JSON route and the markdown route use the
+     unsliced full list - only this one HTML page's copy, sitting right next
+     to a `.slice(0, 8)` call two lines above it, was stale.) Fixed to say 8.
+   - **`listRecentJukeSpaces`'s docstring claimed it "Returns title, status,
+     and time markers only"** - the interface and the actual `.select(...)`
+     query both also include `participant_count` and `recording_url`, and
+     both are genuinely consumed downstream (`page.tsx:318-332`'s
+     listener-count badge and recording-link). The word "only" was the false
+     part. Fixed the docstring to name both fields.
+   - Everything else the sub-agent checked - the JSON/markdown status
+     routes' headers and cache behavior (post-fix from finding #1 above),
+     `jukeChangelog.ts`'s cache TTL and both join branches of
+     `buildResolutionIndex`, `getJukeIntegrationStats` and
+     `listRecentWebhookEvents`'s docstrings, `jukeWebhookVerify.ts`'s replay
+     window and signature format, and `CodeExamplesSection`'s reference
+     snippets - held up on independent verification. No further findings.
+   Commit `b8c8951`.
+
+All of build, lint, typecheck, and test (94/94) pass clean as of the last
+commit this run. Pushed both commits to `origin/main`.
+
+### Explicitly not touched (confirmed blocked on someone outside this
+codebase - same three as every prior run)
+
+- `JUKE_USER_TOKEN` refresh flow
+- Recurring-event cron
+- Agent-in-Juke/ZOE auto-join
+
+### For the next run
+
+- `jukeIntegrationManifest.ts` has now yielded a genuinely new, real finding
+  on four consecutive close reads (Runs 3, 7, 8, 9), each time in a part the
+  previous read hadn't touched. Worth at least one more full pass before
+  assuming it's finally exhausted - this file is large, prose-heavy, and easy
+  to skim past already-fixed sections.
+- `juke-status/page.tsx` has now been read end-to-end multiple times
+  (Runs 4, 5, 7, 9) and both of this run's findings were subtle
+  slice/field-level mismatches, not the more obvious dead-link class of bug
+  earlier runs caught - a sign this file is close to fully swept but not
+  guaranteed clean. If a Run 10 wants one more pass, focus on numeric claims
+  next to array/slice operations specifically, since that's the exact class
+  of bug this run's finding #2 was.
+- `getSupabaseBrowser` (`src/lib/db/supabase.ts`) is still real, working,
+  unused code - same note as Run 8, still a product/scope call, not
+  something to force blind from this sandbox.
+- No other unaudited surface comes to mind. Runs 1-9 combined have now read
+  essentially every route, doc, script, config file, and component in this
+  repo end-to-end, several more than once. If a Run 10 finds nothing new via
+  grep or a fresh targeted re-read of the manifest/status-page files above,
+  it's fair to conclude this repo's Task-B backlog is genuinely close to
+  exhausted - though Run 8's and this run's findings both came from files
+  every prior run had already "finished," so don't assume without checking.
