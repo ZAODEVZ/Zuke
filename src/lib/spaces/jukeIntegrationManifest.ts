@@ -334,7 +334,7 @@ const CONVENTIONS = [
   'juke_spaces is publicly readable (RLS allow-all); writes are service-role only.',
   '/live/{spaceId} is fully public — no auth required to listen.',
   'OG metadata pulls juke.audio/space/{id}/opengraph-image, so Juke renders the share card.',
-  'Stage rooms (audio Clubhouse) and Video Rooms (full A+V) are ZAO concepts; both live alongside Juke.',
+  "The only live audio backend in this repo is Juke (provider id 'juke'). A full-A/V 'video room' backend ('hms') is registered as a reserved provider id but is an unimplemented stub (see src/lib/spaces/providers/hms.ts) - it does not run alongside Juke yet. 'stream'/'songjam' are reserved ids with no implementation at all.",
 ];
 
 const CONTACT: IntegrationContact = {
@@ -378,6 +378,8 @@ export const INTEGRATION_ARCHITECTURE_ASCII = String.raw`
     |    participant.*     -> juke_spaces.participant_count
     |    recording.ready   -> juke_spaces.recording_url
     |                        + autoCastToZao recap to /zao channel
+    |                          (wired but stubbed - no @thezao signer yet,
+    |                           logs-and-no-ops; see 'recap-cast' below)
     v
   Supabase juke_spaces + juke_webhook_events
 
