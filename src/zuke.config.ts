@@ -1,13 +1,15 @@
 /**
  * Zuke product config. `baseUrl` is a derived value - resolve via
- * {@link getBaseUrl} so server + client code agrees on the canonical host
- * even before the custom domain (zuke.thezao.com) lands.
+ * {@link getBaseUrl} so server + client code agrees on the canonical host.
+ * Production now serves on the custom domain (zuke.thezao.com); set
+ * `NEXT_PUBLIC_SITE_URL` explicitly to pin that value if Vercel's own
+ * production-alias env vars don't already reflect it.
  *
  * Resolution order:
  *  1. NEXT_PUBLIC_SITE_URL  - explicit override for prod
  *  2. VERCEL_PROJECT_PRODUCTION_URL - Vercel-provided prod alias
  *  3. VERCEL_URL            - deployment-specific preview alias
- *  4. fallback              - zuke-sandy.vercel.app (current prod alias)
+ *  4. fallback              - zuke-sandy.vercel.app (pre-custom-domain prod alias)
  */
 export const zukeConfig = {
   name: 'Zuke',

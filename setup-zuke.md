@@ -41,6 +41,7 @@ ZUKE_ADMIN_PASSWORD=<optional-legacy-admin-cookie-fallback>
 NEYNAR_API_KEY=<optional-for-recap-pfp-enrichment>
 CRON_SECRET=<random-string-shared-with-the-GitHub-Actions-workflow>
 NEXT_PUBLIC_OPTIMISM_RPC_URL=<optional-custom-optimism-rpc-for-siwf-verify>
+NEXT_PUBLIC_SITE_URL=<optional-canonical-origin-e.g.-https://zuke.thezao.com>
 ```
 
 `SESSION_SECRET` and `ZUKE_ADMIN_FIDS` are required for the live SIWF admin
@@ -65,7 +66,15 @@ Without both repo secrets set, the workflow runs but every call 401s and
 stale rooms never get swept. `NEXT_PUBLIC_OPTIMISM_RPC_URL` is optional -
 it configures the RPC endpoint `/api/auth/verify` uses to check SIWF
 signatures (`src/lib/env.ts`); unset, it falls back to a public Optimism
-RPC (`https://optimism-rpc.publicnode.com`).
+RPC (`https://optimism-rpc.publicnode.com`). `NEXT_PUBLIC_SITE_URL` is
+optional and read directly by `getBaseUrl()` (`src/zuke.config.ts`), the
+first and highest-priority entry in its resolution order - it's what the
+webhook registration route and the recap/wrap-up auto-cast text use to
+build absolute `/live/{id}` URLs. Unset, `getBaseUrl()` falls back to
+Vercel's own `VERCEL_PROJECT_PRODUCTION_URL`/`VERCEL_URL`, which should
+already resolve to your custom domain if one is assigned as the project's
+production domain in Vercel - set this explicitly only if you want to pin
+the value regardless of Vercel's domain-alias behavior.
 
 ## Step 4 - Register Webhook
 
