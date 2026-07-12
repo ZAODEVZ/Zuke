@@ -34,6 +34,7 @@ NEXT_PUBLIC_SUPABASE_URL=<your-supabase-url>
 SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key>
 JUKE_API_KEY=<your-juke-api-key>
 JUKE_WEBHOOK_SECRET=<your-juke-webhook-secret>
+JUKE_CREATE_PASSWORD=<shared-team-password-for-live-create>
 SESSION_SECRET=<random-string-32-chars-or-longer>
 ZUKE_ADMIN_FIDS=<comma-separated-farcaster-fids-allowed-as-admin>
 ZUKE_ADMIN_PASSWORD=<optional-legacy-admin-cookie-fallback>
@@ -45,10 +46,16 @@ CRON_SECRET=<random-string-shared-with-the-GitHub-Actions-workflow>
 auth path (`src/lib/auth/session.ts`) - without `SESSION_SECRET` set to at
 least 32 characters, session handling throws on every request that reaches
 it. `ZUKE_ADMIN_PASSWORD` is only a documented back-compat fallback slated
-for removal once secret rotation (task #71) closes. `CRON_SECRET` gates
-`GET /api/cron/juke-stale-rooms` (returns 401 without a matching bearer
-token) - it must also be added as a **GitHub Actions repository secret**
-(Settings -> Secrets and variables -> Actions), alongside a
+for removal once secret rotation (task #71) closes. `JUKE_CREATE_PASSWORD`
+gates the password path of `POST /api/juke/space`, which is what the
+`/live/create` page's form always uses (`src/app/live/create/page.tsx`) -
+without it set, that page's submit button can never succeed (`Wrong
+password` on every attempt, since an empty/unset shared password never
+matches), which matters because the Verification section below tells you
+to use that exact page to confirm Juke integration end to end. `CRON_SECRET`
+gates `GET /api/cron/juke-stale-rooms` (returns 401 without a matching
+bearer token) - it must also be added as a **GitHub Actions repository
+secret** (Settings -> Secrets and variables -> Actions), alongside a
 `ZUKE_BASE_URL` repo secret (your deployed origin, e.g.
 `https://audio.yourbrand.com`), since
 `.github/workflows/juke-stale-rooms-cron.yml` is what actually calls this

@@ -252,6 +252,7 @@ scripts/juke-spaces-migration-4.sql`}</CodeBlock>
 SUPABASE_SERVICE_ROLE_KEY
 JUKE_API_KEY
 JUKE_WEBHOOK_SECRET   # filled by step-6 webhook register
+JUKE_CREATE_PASSWORD  # shared team password, gates /live/create
 SESSION_SECRET        # 32+ chars, required for SIWF admin sessions
 ZUKE_ADMIN_FIDS       # comma-separated Farcaster FIDs allowed as admin
 CRON_SECRET           # also set as a GitHub Actions repo secret`}</CodeBlock>
