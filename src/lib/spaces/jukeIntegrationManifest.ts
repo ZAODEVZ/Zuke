@@ -392,6 +392,11 @@ export const INTEGRATION_ARCHITECTURE_ASCII = String.raw`
     |  dispatch by event:
     |    room.started      -> juke_spaces.status='active'
     |    room.finished     -> juke_spaces.status='ended'
+    |                        + autoCastToZao recap to /zao channel
+    |                          (ended_via host/api only, skips idle timeouts;
+    |                           wired but stubbed - no @thezao signer yet,
+    |                           logs-and-no-ops; see 'recap-cast-room-finished'
+    |                           below)
     |    participant.*     -> juke_spaces.participant_count
     |    recording.ready   -> juke_spaces.recording_url (first part, back-compat)
     |                        + juke_recordings insert (every part, idempotent)
