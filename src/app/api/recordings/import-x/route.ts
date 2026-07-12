@@ -20,7 +20,10 @@ import { parseXSpaceUrl, X_SPACE_PROVIDER } from '@/lib/spaces/xSpaces';
  * be exported to the recap pipeline like any other recording.
  *
  * Body: { url, title, audioUrl? }
- * Auth: admin or any signed-in host (creation-gated like /live/create).
+ * Auth: any signed-in ZAO user (SIWF session) or admin. Looser than
+ * /live/create's real gate (`POST /api/juke/space`), which requires an admin
+ * session OR the shared JUKE_CREATE_PASSWORD - importing a past X Space
+ * carries no live-room cost/abuse surface, so it doesn't need that gate.
  */
 
 const bodySchema = z.object({
