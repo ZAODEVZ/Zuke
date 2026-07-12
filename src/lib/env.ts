@@ -14,10 +14,14 @@ export const ENV = {
   SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ?? '',
   SESSION_SECRET: process.env.SESSION_SECRET ?? '',
   /**
-   * Neynar API key — resolves Farcaster usernames + PFPs for the recap
-   * pipeline bridge (GET /api/recordings/recap). Server-only; the juke-space-
-   * recap Remotion tool consumes the JSON this produces. Unset = the recap
-   * endpoint returns participants without enriched PFPs rather than failing.
+   * Neynar API key — resolves Farcaster usernames + PFPs. Two independent
+   * consumers: the recap pipeline bridge (GET /api/recordings/recap, reads
+   * this ENV field) and SIWF admin login (POST /api/auth/verify, reads
+   * process.env.NEYNAR_API_KEY directly rather than through this object).
+   * Server-only. Unset = both fall back gracefully rather than failing: the
+   * recap endpoint returns participants without enriched PFPs, and admin
+   * login sessions store `fid:{fid}` as the display name instead of a real
+   * username/PFP.
    */
   NEYNAR_API_KEY: process.env.NEYNAR_API_KEY ?? '',
   ZUKE_ADMIN_FIDS: parseFidList(process.env.ZUKE_ADMIN_FIDS ?? ''),

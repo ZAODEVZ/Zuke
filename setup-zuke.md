@@ -38,7 +38,7 @@ JUKE_CREATE_PASSWORD=<shared-team-password-for-live-create>
 SESSION_SECRET=<random-string-32-chars-or-longer>
 ZUKE_ADMIN_FIDS=<comma-separated-farcaster-fids-allowed-as-admin>
 ZUKE_ADMIN_PASSWORD=<optional-legacy-admin-cookie-fallback>
-NEYNAR_API_KEY=<optional-for-recap-pfp-enrichment>
+NEYNAR_API_KEY=<optional-for-recap-and-admin-login-pfp-enrichment>
 CRON_SECRET=<random-string-shared-with-the-GitHub-Actions-workflow>
 NEXT_PUBLIC_OPTIMISM_RPC_URL=<optional-custom-optimism-rpc-for-siwf-verify>
 NEXT_PUBLIC_SITE_URL=<optional-canonical-origin-e.g.-https://zuke.thezao.com>
@@ -63,10 +63,15 @@ secret** (Settings -> Secrets and variables -> Actions), alongside a
 `.github/workflows/juke-stale-rooms-cron.yml` is what actually calls this
 route every 30 minutes - Vercel Cron isn't available on the Hobby tier.
 Without both repo secrets set, the workflow runs but every call 401s and
-stale rooms never get swept. `NEXT_PUBLIC_OPTIMISM_RPC_URL` is optional -
-it configures the RPC endpoint `/api/auth/verify` uses to check SIWF
-signatures (`src/lib/env.ts`); unset, it falls back to a public Optimism
-RPC (`https://optimism-rpc.publicnode.com`). `NEXT_PUBLIC_SITE_URL` is
+stale rooms never get swept. `NEYNAR_API_KEY` has two independent consumers, not just recap: the recap
+pipeline (`GET /api/recordings/recap`) and SIWF admin login
+(`POST /api/auth/verify`, which reads `process.env.NEYNAR_API_KEY` directly
+to resolve the signed-in admin's Farcaster username/PFP for the session).
+Unset, both degrade gracefully - recap omits PFPs, and admin sessions show
+`fid:{fid}` instead of a real username. `NEXT_PUBLIC_OPTIMISM_RPC_URL` is
+optional - it configures the RPC endpoint `/api/auth/verify` uses to check
+SIWF signatures (`src/lib/env.ts`); unset, it falls back to a public
+Optimism RPC (`https://optimism-rpc.publicnode.com`). `NEXT_PUBLIC_SITE_URL` is
 optional and read directly by `getBaseUrl()` (`src/zuke.config.ts`), the
 first and highest-priority entry in its resolution order - it's what the
 webhook registration route and the recap/wrap-up auto-cast text use to
