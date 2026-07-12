@@ -1,0 +1,21 @@
+name: Juke stale-rooms sweep
+
+# Safety-net trigger for /api/cron/juke-stale-rooms. The primary path for
+# closing a room is the room.finished webhook (jukeWebhookHandlers.ts); this
+# only catches rooms where that webhook was dropped or never fired. Runs on
+# GitHub Actions instead of Vercel Cron because Zuke is on Vercel's free
+# (Hobby) tier and we're deliberately not using Vercel Cron here.
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch: {}
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call juke-stale-rooms endpoint
+        run: |
+          curl --fail --silent --show-error \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.ZUKE_BASE_URL }}/api/cron/juke-stale-rooms"
