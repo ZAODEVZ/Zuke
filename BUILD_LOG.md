@@ -2612,3 +2612,158 @@ codebase - same three as every prior run)
   unused code - same note as Runs 8-17, still a product/scope call.
 - `zukeConfig.brandColor` is still defined with zero consumers - same note
   as Runs 10-17, flagged in case future branding work wants it.
+
+## Run 19 — 2026-07-12
+
+Read this file fully before starting. Local checkout was HEAD-detached at
+Run 18's last commit (`b60590e`), already equal to `origin/main` (0 commits
+behind) - same recurring pattern as every prior run. Checked out a tracking
+`main` branch pointed at it, no fast-forward needed. Re-verified from a
+clean `npm install` (removed `node_modules` first): `build`, `lint`,
+`typecheck`, `test` (94/94) all pass clean before touching anything.
+
+### Task A - still correctly ruled out (Run 1). Not re-investigated this
+run; nothing prompted a re-check.
+
+### Task C - re-verified all 4 roadmap items directly against current
+code, via four parallel sub-agents each independently re-verifying one
+item from scratch (not trusting this file's prior claims blindly); every
+result matched what Runs 10-18 already established, no drift on any item
+
+1. **Item 1 (SIWN)** - re-grepped every `ZUKE_ADMIN_PASSWORD` consumer:
+   still exactly `session.ts:48-53`'s explicitly opt-in legacy fallback
+   block (only activates if the env var is set). Every admin-gated route
+   (agent-join, delete-webhook, register-webhook, mark-ended, end-space,
+   `/api/juke/space`, `/admin`, `/admin/login`) still checks
+   `getSessionData().isAdmin`, resolved via SIWF + `ZUKE_ADMIN_FIDS` at
+   login. `JUKE_CREATE_PASSWORD` confirmed still a distinct, intentional
+   mechanism for `/live/create`, not conflated with the deprecated admin
+   password. `setup-zuke.md`'s roadmap still correctly omits this item.
+   No change.
+2. **Item 2 (signer)** - re-read `src/lib/publish/auto-cast.ts` in full:
+   still an unconditional stub (logs, returns `null`, zero conditional
+   logic). Repo-wide grep for "signer" still turns up zero real credential
+   references anywhere - only the honest stub-caveat text every prior run
+   found. `jukeIntegrationManifest.ts`'s `recap-cast`/
+   `recap-cast-room-finished` entries and the ASCII diagram still honestly
+   caveat "wiring shipped, posting not yet live." Confirmed still blocked
+   on a @thezao Farcaster signer credential this sandbox cannot provision
+   or fake. No change.
+3. **Item 3 (custom domain)** - `getBaseUrl()`'s doc comment still
+   correctly states production serves on `zuke.thezao.com` (no stale
+   "before it lands" language). Repo-wide grep for `zaoos.com`/`localhost`
+   in `src/`: zero real hits (only this log's own history and a legitimate
+   test-file `localhost`). Every consumer (webhook handlers, register-
+   webhook route, `AuthKitWrapper.tsx`'s SSR fallback, the manifest's
+   hardcoded URLs, `juke-status/page.tsx`'s reference snippet) still
+   consistently targets the custom domain. `setup-zuke.md`'s roadmap still
+   correctly omits this item, with `NEXT_PUBLIC_SITE_URL` still documented.
+   No change needed - remains verified-done.
+4. **Item 4 (branding)** - `public/` still only the five unmodified
+   create-next-app SVGs, none referenced in `src/`. `favicon.ico` md5
+   still `c30c7d42707a47a3f4591831641e50dc` - byte-identical to Runs
+   10-18's check, still the stock Next.js default. Fresh grep for stray
+   "ZAO" mislabeling on product surfaces: every hit is a legitimate
+   reference to the ZAO org/community, not the Zuke product itself. Root
+   layout and per-page metadata (`/admin`, `/admin/login`, `/live/create`)
+   all still use `zukeConfig.name`, not boilerplate. **No new gap; the
+   logo/favicon asset is still the one documented missing piece, still
+   needs a human-provided design asset.**
+
+All 4 roadmap items remain exactly where Runs 10-18 left them: items 1 and
+3 done, item 2 blocked on an external credential, item 4's code-side gap
+already fixed with the design-asset gap itself still real and outside this
+sandbox's control. Given nine consecutive fully-stable re-verifications
+(Runs 10-18, now 19) with zero drift on any of the four items, future runs
+can treat a quick re-grep/re-check of each item's key signal (the
+`ZUKE_ADMIN_PASSWORD` consumer list, the `auto-cast.ts` stub body, the
+`zaoos.com`/`localhost` grep, the favicon md5) as sufficient confirmation
+rather than a full from-scratch sub-agent dispatch per item every run,
+unless a commit that run actually touches the relevant surface.
+
+### Fallback Task B sweep - one real, verified finding, fixed
+
+Dispatched one Explore sub-agent into fresh territory Run 18 hadn't
+covered (config/toolchain files were Run 18's rotation; this run's targets
+were `src/middleware.ts` existence, env template files, the full webhook
+handler bodies cross-checked against the manifest/README, a fresh read of
+`src/lib/auth/nonce.ts` + all of `src/app/api/auth/**`, `docs/` in full,
+the last 10 commits' claims vs. docs, and a full `src/components/**`
+listing for anything not yet individually checked). Six of seven areas
+came back clean; explicitly excluded `jukeIntegrationManifest.ts`'s
+dedicated close-read per Run 17's still-standing pause recommendation
+(no commit this run touched webhook handlers, the provider registry,
+create-space fields, or admin routes, so no targeted grep-check was
+needed either). One real finding, independently re-verified against the
+actual code myself before fixing, per instructions:
+
+1. **`src/lib/env.ts`'s `NEYNAR_API_KEY` docstring and
+   `setup-zuke.md:41`'s env var list both undersold this var's actual
+   scope.** Both described it as feeding only the recap pipeline
+   (`GET /api/recordings/recap`). Verified directly: `src/app/api/auth/
+   verify/route.ts:25-49`'s `fetchNeynarProfile` (called at line 107) is a
+   second, independent consumer - it resolves the signed-in admin's
+   Farcaster username/PFP for the session at SIWF login time, reading
+   `process.env.NEYNAR_API_KEY` directly rather than through the `ENV`
+   object (`recap/route.ts` correctly uses `ENV.NEYNAR_API_KEY`). Unset,
+   this path degrades gracefully too (falls back to `fid:{fid}` as the
+   display name, `verify/route.ts:107-111`) - a behavior neither doc
+   mentioned at all. Fixed both `env.ts`'s docstring and
+   `setup-zuke.md`'s var description + added prose paragraph to name both
+   consumers and their independent fallback behavior. Commit `6d3f87f`.
+
+   Everything else the sub-agent checked - `middleware.ts` (still
+   confirmed absent), env template files (still none committed, matching
+   `.gitignore`), the full webhook handler bodies for every event case
+   against the manifest/README claims, `docs/recap.md` against
+   `recap/route.ts`, the last 10 commits' claims (package.json rename,
+   `tsx` devDependency, `@neynar/nodejs-sdk` removal) against every doc,
+   and `AdminLoginButton.tsx` (the one component not yet individually
+   named in a prior run's findings, but carries no docstrings/prose claims
+   to be false) - held up on independent verification or had nothing to
+   check.
+
+All of build, lint, typecheck, and test (94/94) pass clean as of the last
+commit this run. Pushed to `origin/main`.
+
+### Explicitly not touched (confirmed blocked on someone outside this
+codebase - same three as every prior run)
+
+- `JUKE_USER_TOKEN` refresh flow
+- Recurring-event cron
+- Agent-in-Juke/ZOE auto-join (specifically the *unattended*/auto-join
+  piece - unchanged since Run 13, still blocked on both the VPS-side
+  session-token consumer and `allow_agents` not being exposed on the real
+  create path, per Run 16)
+
+### For the next run
+
+- All 4 roadmap items remain in the same state Runs 10-18 left them: items
+  1 and 3 done, item 2 blocked on a @thezao Farcaster signer credential,
+  item 4's code-side gap fixed with the logo/favicon design asset itself
+  still the one open piece. **Nine consecutive runs (10-18, now 19) have
+  found zero drift on any of the four items** - a lighter-weight re-check
+  (targeted grep/read of each item's key signal, not a full sub-agent
+  dispatch per item) is a reasonable default going forward unless a commit
+  actually touches the surface an item depends on.
+- `jukeIntegrationManifest.ts`'s dedicated close-read sub-agent is still
+  correctly paused per Run 17's recommendation - resume it only if a
+  future commit touches webhook handlers, the provider registry,
+  create-space fields, or admin routes (do a targeted grep-check of the
+  manifest's corresponding claim first), or once enough runs have passed
+  that a fresh full read is cheap insurance again.
+- `NEYNAR_API_KEY`'s two independent consumers (recap pipeline, SIWF
+  admin login) are now correctly documented in both `env.ts` and
+  `setup-zuke.md`. Worth noting for any future run touching either
+  consumer: `verify/route.ts` reads `process.env.NEYNAR_API_KEY` directly
+  instead of through the `ENV` object like every other consumer in the
+  codebase - a minor inconsistency (not a false claim, so not fixed as
+  part of this run's finding), worth a look if a future run wants to
+  normalize env-var access patterns.
+- The two adjacent product questions from Run 16/17 (`allowAgents`
+  default, `record` default on `/live/create`) still need a human
+  decision, not invented code - unchanged this run.
+- `getSupabaseBrowser` (`src/lib/db/supabase.ts`) is still real, working,
+  unused code - same note as Runs 8-18, still a product/scope call.
+- `zukeConfig.brandColor` is still defined with zero consumers - same note
+  as Runs 10-18, flagged in case future branding work wants it.
