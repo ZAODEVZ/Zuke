@@ -5,9 +5,11 @@
  * server calls — `/embed/{spaceId}` renders Juke's full UI (anonymous listen,
  * SIWF participation, hand-raise, mic). See research doc 695.
  *
- * `frame-src` and the `microphone` Permissions-Policy in `src/middleware.ts`
- * must list `https://juke.audio` for the iframe to render and for speakers to
- * publish audio.
+ * No CSP or Permissions-Policy header is configured anywhere in this repo
+ * (no `middleware.ts`, no headers() in `next.config.ts`) - the iframe's own
+ * `allow` attribute (`JukeEmbed.tsx`) is what grants microphone access to
+ * `https://juke.audio`, and the browser's default frame-embedding rules
+ * otherwise apply.
  */
 
 /** Canonical Juke origin. The embed and all Juke surfaces live here. */
