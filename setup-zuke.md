@@ -26,16 +26,25 @@ bucket. See `docs/recap.md` for the recordings / snippets / recap-video flow.
 
 ## Step 3 - Environment Variables
 
-Copy `.env.example` to `.env.local` and fill in:
+Create `.env.local` (there is no committed `.env.example` - `.gitignore`
+excludes all `.env*` files) and fill in:
 
 ```
 NEXT_PUBLIC_SUPABASE_URL=<your-supabase-url>
 SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key>
 JUKE_API_KEY=<your-juke-api-key>
 JUKE_WEBHOOK_SECRET=<your-juke-webhook-secret>
-ZUKE_ADMIN_PASSWORD=<a-secure-password-for-v0>
+SESSION_SECRET=<random-string-32-chars-or-longer>
+ZUKE_ADMIN_FIDS=<comma-separated-farcaster-fids-allowed-as-admin>
+ZUKE_ADMIN_PASSWORD=<optional-legacy-admin-cookie-fallback>
 NEYNAR_API_KEY=<optional-for-recap-pfp-enrichment>
 ```
+
+`SESSION_SECRET` and `ZUKE_ADMIN_FIDS` are required for the live SIWF admin
+auth path (`src/lib/auth/session.ts`) - without `SESSION_SECRET` set to at
+least 32 characters, session handling throws on every request that reaches
+it. `ZUKE_ADMIN_PASSWORD` is only a documented back-compat fallback slated
+for removal once secret rotation (task #71) closes.
 
 ## Step 4 - Register Webhook
 
@@ -67,13 +76,13 @@ vercel --prod
 
 ## Verification
 
-1. Navigate to `/zuke-status` with the admin password cookie
-2. Click "Create Test Space" to verify Juke integration
+1. Navigate to `/juke-status` (public dashboard, no auth needed) to confirm
+   the deployment sees Juke as configured
+2. Create a room via `/live/create` to verify Juke integration end to end
 3. Check webhook delivery in the webhook status view
 
 ## v1 Roadmap
 
-- Replace admin password with Farcaster SIWN
 - Integrate ZAO signer for auto-casting to @thezao
 - Custom domain: zuke.thezao.com
 - Branding: Zuke identity + logo

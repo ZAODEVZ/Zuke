@@ -35,4 +35,5 @@ npm run test      # Run tests
 
 ## Environment Variables
 
-See `.env.example` or `setup-zuke.md` for the full list.
+See `setup-zuke.md` Step 3 for the full list (no `.env.example` is
+committed - `.gitignore` excludes all `.env*` files).
