@@ -1735,3 +1735,180 @@ codebase - same three as every prior run)
   unused code - same note as Runs 8-12, still a product/scope call.
 - `zukeConfig.brandColor` is still defined with zero consumers - same note
   as Runs 10-12, flagged in case future branding work wants it.
+
+## Run 14 — 2026-07-12
+
+Read this file fully before starting. Local checkout was HEAD-detached at
+Run 13's last commit (`12e13dd`), already equal to `origin/main` (0 commits
+behind) - checked out a tracking `main` branch pointed at it, no fast-forward
+needed. Re-verified from a clean `npm install` (removed `node_modules` first):
+`build`, `lint`, `typecheck`, `test` (94/94) all pass clean before touching
+anything.
+
+### Task A - still correctly ruled out (Run 1). Re-verified
+`juke-api-reads.ts` directly this run: still only GET-by-id and DELETE-by-id
+for webhooks, no list-by-URL endpoint. Nothing has changed.
+
+### Task C - re-verified all 4 roadmap items directly against current code;
+no change in status on any of them
+
+1. **Item 1 (SIWN)** - re-grepped every `ZUKE_ADMIN_PASSWORD` consumer in
+   `src/`: still exactly `session.ts:48-53`'s explicitly opt-in legacy
+   fallback block. Already correctly absent from `setup-zuke.md`'s roadmap
+   list. No change.
+2. **Item 2 (signer)** - re-grepped "signer" repo-wide and re-read
+   `src/lib/publish/auto-cast.ts` in full: still an unconditional stub (logs,
+   returns `null`), still zero real credential references anywhere in code,
+   env vars, or docs. Confirmed still blocked on a @thezao Farcaster signer
+   this sandbox cannot provision or fake. No change.
+3. **Item 3 (custom domain)** - confirmed `setup-zuke.md`'s current
+   `## v1 Roadmap` section still correctly omits the domain item (only
+   "Integrate ZAO signer..." and "Branding..." remain), with the
+   shipped-note intact below it (Run 11's fix). No leftover `zaoos.com`/
+   `localhost` references in `src/` (the one `localhost` hit is a legitimate
+   test fixture URL in `providers.test.ts`). No change needed.
+4. **Item 4 (branding)** - re-checked `public/` (still only the five
+   unmodified create-next-app SVGs) and `src/app/favicon.ico` (md5
+   `c30c7d42707a47a3f4591831641e50dc`, byte-identical to Runs 10-13's check -
+   still the stock create-next-app default). **No new gap; the logo/favicon
+   asset is still the one documented missing piece, still needs a
+   human-provided design asset.**
+
+All 4 roadmap items remain exactly where Run 13 left them: items 1 and 3
+done, item 2 blocked on an external credential, item 4's code-side gap
+already fixed with the design-asset gap itself still real and outside this
+sandbox's control.
+
+### Ninth close read of `jukeIntegrationManifest.ts` (per Run 13's pointer -
+eight consecutive prior close reads each found something new) - one real
+finding, verified myself before fixing
+
+Dispatched one Explore sub-agent for a full line-by-line ninth read,
+explicitly told to re-verify every claim against current code from scratch:
+all ~30 `files:` paths, both status-header versions, both count pairs, the
+three-table claim, CONVENTIONS vs. the real provider registry, the webhook
+verifier details, the full event-dispatch table, the three
+removed-SHIPPED-entries and three removed-OPEN_ASKS comments, and every
+remaining open OPEN_ASKS entry. It reported exactly one finding, which I
+independently re-verified against the real code myself before fixing:
+
+1. **The `agent-join-consumer` SHIPPED entry (added by Run 13) claimed
+   `joinAgentInJukeRoom` "is wired into two call sites."** Verified via
+   `grep -rn "joinAgentInJukeRoom" src`: the helper is imported and called
+   exactly once, from `jukeWebhookHandlers.ts`'s auto-join hook.
+   `src/app/api/juke/admin/agent-join/route.ts` never imports
+   `jukeAgentJoin.ts` at all - I read the route in full and confirmed it has
+   its own independent inline `fetch` to the same Juke endpoint, with its
+   own header construction and response parsing. So the "shared helper, two
+   call sites" framing was false: in reality there are two independent
+   implementations of the same call, only one of which uses the named
+   helper. Rewrote the description to state this accurately. Commit
+   `4ae658c` (combined with the fallback-sweep fix below, same file, same
+   close-read pass).
+
+### Fallback Task B sweep (per instructions, since Task C's per-run gaps
+were exhausted after the above) - four real findings, all independently
+verified before fixing
+
+Dispatched one Explore sub-agent in parallel with the manifest read, scoped
+to areas not the focus of a *recent* close read: `src/app/live/[spaceId]/page.tsx`,
+`src/app/admin/AdminConsole.tsx` and the remaining `src/components/spaces/*.tsx`
+files, a full `README.md` read against `setup-zuke.md`'s current 2-item
+roadmap, a repo-wide sweep for hardcoded counts sitting next to
+`.slice(`/`.limit(`, and a fresh TODO/FIXME/XXX/HACK/STUB/"not yet" grep
+across `src/`, `docs/`, and top-level `*.md`. It reported four findings; each
+verified directly against the real code myself before fixing, per
+instructions:
+
+1. **`src/app/juke-status/page.tsx`'s own `ArchitectureSection` still said
+   "ZAO holds two persisted tables" (`juke_spaces` + `juke_webhook_events`)**
+   - the exact false claim Run 11 already fixed in the manifest's markdown
+   prose (`jukeIntegrationManifest.ts`, now correctly says "three," including
+   `juke_recordings`). This page has its own independent copy of that prose
+   that no prior run ever touched - confirmed via `git log -S` on the string,
+   unchanged since the file's original commit. Fixed to say three tables and
+   name `juke_recordings`. Commit `9a595e5`.
+2. **`src/lib/spaces/jukeIntegrationManifest.ts`'s ASCII diagram
+   webhook-dispatch section omitted `juke_recordings` entirely** - it showed
+   `recording.ready -> juke_spaces.recording_url` and a terminal box of only
+   `juke_spaces + juke_webhook_events`, in a part of the same file neither
+   Run 8's nor Run 11's fixes touched. Verified `jukeWebhookHandlers.ts:246-278`
+   directly: the handler inserts every recording part into `juke_recordings`
+   (idempotent on `space_id`+`url`) in addition to updating
+   `juke_spaces.recording_url` with just the first part for back-compat.
+   Fixed the diagram line and the terminal Supabase box to name all three
+   tables. Commit `4ae658c` (same commit as the agent-join-consumer fix
+   above - same file, same read pass).
+3. **`src/app/listen/page.tsx` - a real, verified logic bug: the "See all"
+   link to `/live/recordings` could never render.** `recorded` came from
+   `listRecordedJukeSpaces(6)`, whose own query caps the result at
+   `Math.min(Math.max(1, limit), 100)` = exactly 6 rows
+   (`jukeSpacesDb.ts:289-298`) - so `recorded.length > 6`, the link's gating
+   condition, was dead code from the original commit: no matter how many
+   recordings actually exist in the DB, the array handed to the page could
+   never exceed 6, and the link would never show. Fixed by fetching one
+   extra row (`listRecordedJukeSpaces(7)`), checking overflow on the
+   unsliced result (`hasMoreRecorded = recordedRaw.length > 6`), then
+   slicing to the displayed 6 (`recordedRaw.slice(0, 6)`) - same pattern
+   already used elsewhere in this file for `live` (fetch-wide, slice-narrow).
+   This is a real, buildable engineering bug fix, not a doc-only correction.
+   Commit `ebcc9f2`.
+4. **`src/lib/spaces/juke.ts`'s docstring claimed `frame-src` and the
+   `microphone` Permissions-Policy live in `src/middleware.ts`** - confirmed
+   no such file exists anywhere in the repo (only Next.js's own generated
+   `.next/server/middleware-*` build artifacts, not a source file), and
+   `next.config.ts` is an empty stub with no `headers()` config; no
+   `vercel.json` exists either. Repo-wide grep for "frame-src" and
+   "Permissions-Policy" returns zero hits outside this one docstring - no
+   CSP or Permissions-Policy is configured anywhere in this codebase. The
+   real mechanism granting microphone access to the Juke iframe is
+   `JukeEmbed.tsx:104`'s own `allow` attribute
+   (`'autoplay; microphone'`/`'autoplay'`), confirmed by reading that file
+   directly. Rewrote the docstring to state this. Commit `388db73`.
+
+All of build, lint, typecheck, and test (94/94) pass clean as of the last
+commit this run. Pushed all four commits to `origin/main`.
+
+### Explicitly not touched (confirmed blocked on someone outside this
+codebase - same three as every prior run)
+
+- `JUKE_USER_TOKEN` refresh flow
+- Recurring-event cron
+- Agent-in-Juke/ZOE auto-join (specifically the *unattended*/auto-join
+  piece - unchanged since Run 13)
+
+### For the next run
+
+- All 4 roadmap items remain in the same state Runs 11-13 left them: items 1
+  and 3 done, item 2 blocked on a @thezao Farcaster signer credential, item
+  4's code-side gap fixed with the logo/favicon design asset itself still
+  the one open piece. None of these are engineering gaps left in this
+  sandbox's control - say so plainly rather than re-litigating items 1-3
+  from scratch every run.
+- `jukeIntegrationManifest.ts` has now yielded a genuinely new, real finding
+  on **nine** consecutive close reads (Runs 3, 7, 8, 9, 10, 11, 12, 13, 14).
+  This run's manifest-specific finding was narrow (one mis-described
+  call-site count), consistent with the shrinking-backlog trend Run 11/12
+  noted - but the *fallback sweep* also found a second, unrelated issue in
+  this same file (the diagram's missing `juke_recordings`), a reminder that
+  a narrow finding from the manifest-focused read doesn't mean the file is
+  fully clean; a differently-scoped read can still find something the
+  focused read's checklist didn't happen to cover.
+- This run's most notable finding was `listen/page.tsx`'s dead
+  `recorded.length > 6` condition (finding #3 above) - a genuine functional
+  bug (a real UI link that could never render), not just a doc/comment
+  correction, caught by the "hardcoded count next to `.slice`/`.limit`" sweep
+  pattern several prior runs have used for the manifest/status-page files.
+  Worth remembering that pattern generalizes beyond those two files - it
+  found a real bug in a third file this run.
+- Two files (`juke-status/page.tsx`'s ArchitectureSection prose,
+  `jukeIntegrationManifest.ts`'s markdown-route prose) had said the same
+  "two tables" thing independently; Run 11 fixed one copy, this run found
+  and fixed the other. Same lesson as Run 11's note about grepping for a
+  literal old phrase repo-wide after a fix - worth doing for prose claims
+  that could plausibly exist as an independent copy elsewhere, not just
+  exact-string duplicates.
+- `getSupabaseBrowser` (`src/lib/db/supabase.ts`) is still real, working,
+  unused code - same note as Runs 8-13, still a product/scope call.
+- `zukeConfig.brandColor` is still defined with zero consumers - same note
+  as Runs 10-13, flagged in case future branding work wants it.
