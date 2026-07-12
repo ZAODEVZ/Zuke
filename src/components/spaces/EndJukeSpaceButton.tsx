@@ -16,9 +16,9 @@ type EndState =
 
 /**
  * Host/admin-only "End space" button. Calls `/api/juke/admin/end-space` which
- * proxies to Juke's developer end endpoint (PR #174 on their side). If Juke
- * 404s the endpoint (not shipped yet), our server falls back to a local
- * mark-ended write so /spaces stops showing the row as Live.
+ * proxies to Juke's developer end endpoint (shipped, PR #174). If Juke 404s
+ * (cross-app / iOS-native room we don't own), our server falls back to a
+ * local mark-ended write so /live stops showing the row as Live.
  *
  * Rendering is gated by the server (we only render this for session.fid
  * matching `created_by_fid`, or admin). We do not re-check that here - the
