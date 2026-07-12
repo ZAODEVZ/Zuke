@@ -243,7 +243,7 @@ const SHIPPED: ShippedFeature[] = [
     id: 'host-end-space-button',
     title: 'Host "End space" button on /live/{id} + admin end-space route',
     description:
-      "Iframe Leave is a pure LiveKit room.disconnect() with anon: participant identity - no API call, so rooms we create via developer API stay alive until LiveKit's 300s empty-room timeout. EndJukeSpaceButton on /live/{id} (gated to host or admin via SSR session) calls POST /api/juke/admin/end-space which proxies to Juke's POST /v1/developer/spaces/{id}/end (Nicky's PR #174). On a 404 from Juke (endpoint not shipped yet, or cross-app room), the route falls back to flipping our local juke_spaces row to ended so /spaces stops showing dead rooms as Live. The webhook handler remains the source of truth for the canonical room.finished event - we do not pre-flip our DB on the success path. Two-step confirm pattern on the button prevents fat-finger ends.",
+      "Iframe Leave is a pure LiveKit room.disconnect() with anon: participant identity - no API call, so rooms we create via developer API stay alive until LiveKit's 300s empty-room timeout. EndJukeSpaceButton on /live/{id} (gated to host or admin via SSR session) calls POST /api/juke/admin/end-space which proxies to Juke's POST /v1/developer/spaces/{id}/end (Nicky's PR #174). On a 404 from Juke (endpoint not shipped yet, or cross-app room), the route falls back to flipping our local juke_spaces row to ended so /live stops showing dead rooms as Live. The webhook handler remains the source of truth for the canonical room.finished event - we do not pre-flip our DB on the success path. Two-step confirm pattern on the button prevents fat-finger ends.",
     shippedAt: '2026-05-24',
     files: [
       'src/app/api/juke/admin/end-space/route.ts',
@@ -382,7 +382,7 @@ export const INTEGRATION_ARCHITECTURE_ASCII = String.raw`
   Supabase juke_spaces + juke_webhook_events
 
   CREATE PATH (host):
-    USER -> /spaces (Go Live) OR /live/create
+    USER -> /live/create
          -> POST /api/juke/space
          -> POST api.juke.audio/v1/developer/spaces
             X-Juke-Api-Key only (room owner = app.owner_fid)

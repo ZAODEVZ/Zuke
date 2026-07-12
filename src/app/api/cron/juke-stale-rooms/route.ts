@@ -133,7 +133,7 @@ export async function GET(request: NextRequest) {
         }
         // Juke says ended (or scheduled) - flip our row.
       } else if (detail.status === 404) {
-        // Cross-app or deleted on Juke's side. Flip locally so /spaces stops
+        // Cross-app or deleted on Juke's side. Flip locally so /live stops
         // listing a row Juke does not even know about.
       } else if (detail.status === 429) {
         // Read budget hit (120/min per key per Nicky's PR #175). Fall back

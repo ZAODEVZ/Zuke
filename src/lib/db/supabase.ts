@@ -35,8 +35,10 @@ export const supabaseAdmin: SupabaseClient = new Proxy({} as SupabaseClient, {
   },
 });
 
-// Browser-side anon client for /spaces real-time + public reads. Returns a
-// minimal stub if NEXT_PUBLIC_SUPABASE_URL is missing so build does not crash.
+// Browser-side anon client (RLS-scoped, not the service-role key above).
+// Currently unused by any route/component - kept for future client-side
+// real-time or public reads. Returns a minimal stub if
+// NEXT_PUBLIC_SUPABASE_URL is missing so build does not crash.
 export function getSupabaseBrowser(): SupabaseClient {
   return createClient(
     ENV.SUPABASE_URL || 'https://placeholder.supabase.co',
