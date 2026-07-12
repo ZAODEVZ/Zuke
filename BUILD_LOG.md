@@ -2903,3 +2903,107 @@ codebase - same three as every prior run)
 - `NEYNAR_API_KEY` consumer inconsistency (`verify/route.ts` reads
   `process.env` directly instead of via `ENV`) flagged in Run 19 remains
   unfixed - not a false claim, just a normalization opportunity.
+
+## Run 21 — 2026-07-12
+
+Read this file fully before starting. Local checkout was HEAD-detached at
+Run 20's last commit (`c503f29`), already equal to `origin/main` (0 commits
+behind) - same recurring pattern as every prior run. Checked out a tracking
+`main` branch pointed at it. Re-verified from a clean `npm install` (removed
+`node_modules` first): `build`, `lint`, `typecheck`, `test` (94/94) all pass
+clean before touching anything.
+
+### Task A - still correctly ruled out (Run 1). Not re-investigated this
+run; nothing prompted a re-check.
+
+### Task C - lightweight re-check per Run 19/20's established pattern
+(targeted grep/read of each item's key signal, not a full sub-agent
+dispatch); zero drift on all 4 items, eleventh consecutive stable run
+(10-20, now 21)
+
+1. **Item 1 (SIWN)** - `ZUKE_ADMIN_PASSWORD` still only referenced in
+   `session.ts:48-53`'s explicitly opt-in legacy fallback block and
+   `env.ts`'s declaration. No change.
+2. **Item 2 (signer)** - `auto-cast.ts` still the unconditional stub (logs,
+   returns `null`). Still blocked on a @thezao Farcaster signer credential
+   this sandbox cannot provision or fake. No change.
+3. **Item 3 (custom domain)** - zero `zaoos.com` hits and zero non-test
+   `localhost` hits anywhere in `src/` (the one hit is
+   `providers.test.ts`'s legitimate fixture URL). Remains verified-done.
+4. **Item 4 (branding)** - `public/` still only the five unmodified
+   create-next-app SVGs (md5s unchanged from every prior check);
+   `favicon.ico` md5 still `c30c7d42707a47a3f4591831641e50dc`, byte-identical
+   to every prior run. Still the one documented gap needing a
+   human-provided design asset.
+
+`setup-zuke.md`'s `## v1 Roadmap` section independently re-read: still
+correctly lists only "Integrate ZAO signer..." and "Branding..." with the
+shipped-domain note intact below it - matches all of the above exactly.
+
+### Fallback Task B sweep - dispatched one Explore sub-agent into fresh
+territory: every remaining `src/` file not yet individually, closely
+audited by name in Runs 1-20 (19 files total) - `recordingsStorage.ts`,
+`juke-partner-token.ts`, `providers/juke.ts`, `providers/types.ts`,
+`juke-api.ts` (as distinct from the already-audited `juke-api-reads.ts`),
+`JukeListenerBadge.tsx`, `RecordingsManager.tsx`, `ImportXSpaceForm.tsx`,
+`JukeLinkOpener.tsx`, `live/import/page.tsx`, `live/page.tsx`,
+`partner-token/route.ts`, `snippet/route.ts`, `upload/route.ts`,
+`auth/logout/route.ts`, `auth/nonce/route.ts`, `JukeStatusTabs.tsx`,
+`juke/page.tsx`, and root `page.tsx`. It cross-checked every
+behavior/count/gating claim in each file against the real code (including
+callees like `xSpaces.ts`, `/api/juke/space/route.ts`, `AdminConsole.tsx`,
+`live/create/page.tsx`, `providers/hms.ts`/`index.ts`, and the migration
+SQL files). **Zero findings - all 19 files clean on independent
+verification.** This is the first fully clean fallback sweep since Run 12,
+and (combined with Run 19/20's stable Task C and the now largely-exhausted
+`jukeIntegrationManifest.ts` well) means essentially the entire `src/` tree
+has now been individually, closely read at least once, with cross-checked
+claims holding up.
+
+No code or doc changes made this run - nothing to fix. Re-ran build, lint,
+typecheck, and test (94/94) one more time after the sweep to confirm
+nothing drifted mid-run; all still pass clean. Only this log entry is
+being committed.
+
+### Explicitly not touched (confirmed blocked on someone outside this
+codebase - same three as every prior run)
+
+- `JUKE_USER_TOKEN` refresh flow
+- Recurring-event cron
+- Agent-in-Juke/ZOE auto-join (specifically the *unattended*/auto-join
+  piece - unchanged since Run 13, still blocked on both the VPS-side
+  session-token consumer and `allow_agents` not being exposed on the real
+  create path, per Run 16)
+
+### For the next run
+
+- All 4 roadmap items remain in the same state Runs 10-20 left them: items
+  1 and 3 done, item 2 blocked on a @thezao Farcaster signer credential,
+  item 4's code-side gap fixed with the logo/favicon design asset itself
+  still the one open piece. Eleventh consecutive stable run - the
+  lighter-weight re-check continues to hold up fine.
+- **The `src/` tree now appears genuinely, fully swept**: this run's
+  fallback sweep was explicitly scoped to "every file not yet individually
+  audited by name" and came back with zero findings across all 19 remaining
+  files. Combined with Run 12's prior clean sweep and Run 17's
+  recommendation to pause `jukeIntegrationManifest.ts`'s dedicated
+  close-read, a future run that also finds nothing via a fresh targeted
+  grep should treat this repo's Task B backlog as genuinely exhausted for
+  now, not assume there's always one more finding. Worth checking `docs/`
+  and top-level `*.md` once more from scratch as the next candidate if a
+  future run wants one more angle before concluding that, since this run's
+  sweep was `src/`-only.
+- `jukeIntegrationManifest.ts`'s dedicated close-read sub-agent remains
+  correctly paused per Run 17 - resume only if a future commit touches
+  webhook handlers, the provider registry, create-space fields, or admin
+  routes.
+- Still-open, still-flagged items needing a human decision or credential,
+  unchanged this run: the @thezao signer credential (item 2), the
+  logo/favicon design asset (item 4), `NEYNAR_API_KEY`'s direct-`process.env`
+  read in `verify/route.ts` (normalization only, Run 19), `import-x/route.ts`'s
+  more-permissive-than-`/live/create` auth gate (Run 20, assumption not
+  confirmed product decision), the `allowAgents`/`record` defaults on
+  `/live/create` (Runs 16-17), `getSupabaseBrowser` unused-but-correct code
+  (Runs 8-19), `zukeConfig.brandColor` unused-but-correct config (Runs
+  10-19), and the missing Supabase-mocking test infra for webhook-handler
+  regression coverage (Run 20).
