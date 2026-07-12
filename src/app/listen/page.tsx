@@ -79,11 +79,15 @@ function formatEnded(value: string | null): string {
 // "Live now" stale guard - hide DB rows still flagged active but with no
 // recent participant activity. We've been bitten repeatedly by rows that
 // stay active forever because the host walked away without triggering
-// room.finished and the stale-room cron only runs daily on Hobby tier. A
-// row started >60min ago is suspect unless we can prove someone is still
-// in it. /spaces uses the same 30min threshold for its "Stale" badge, but
-// /listen is a member-pull surface so we exclude rather than dim - showing
-// 5 dead rooms as Live actively hurts trust.
+// room.finished. The stale-room cron (GitHub Actions, every 30min - Vercel
+// Cron isn't usable on the Hobby tier) is the authoritative cleanup, but it
+// only flips a row after a much more conservative 2h threshold
+// (STALE_THRESHOLD_MINUTES in /api/cron/juke-stale-rooms/route.ts), so a
+// dead room can sit `active` for up to 2h before the cron catches it. This
+// page applies its own tighter 60min heuristic on top so /listen - a
+// member-pull surface - doesn't show a dead room as Live for that long;
+// we exclude rather than dim, since a wrong "Live" badge actively hurts
+// trust more than a room silently missing from the list.
 const LIVE_STALE_THRESHOLD_MS = 60 * 60 * 1000;
 function isJukeRowProbablyLive(row: JukeSpaceRow): boolean {
   if (row.status !== 'active') return false;
@@ -197,7 +201,7 @@ export default async function ListenPage() {
             <Link href="/juke-status" className="text-gray-400 hover:text-[#f5a623]">
               Build status
             </Link>
-            <Link href="/spaces" className="text-gray-400 hover:text-[#f5a623]">
+            <Link href="/live" className="text-gray-400 hover:text-[#f5a623]">
               All audio surfaces
             </Link>
           </div>
