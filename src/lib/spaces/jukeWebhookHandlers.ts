@@ -250,7 +250,6 @@ export async function applyWebhookEvent(
       // recording_url pointed at the FIRST part for back-compat.
       const parts = readRecordingParts(body);
       if (parts.length === 0) return;
-      await updateJukeSpace(spaceId, { recording_url: parts[0].url });
 
       // part_index continues from whatever is already attached so a later
       // delivery (another part) appends rather than colliding.
@@ -260,6 +259,14 @@ export async function applyWebhookEvent(
       } catch (err: unknown) {
         logger.warn('[juke/webhooks] countRecordingsForSpace failed (non-fatal):', err);
       }
+
+      // Only this space's true first part should ever set the legacy
+      // recording_url - a later delivery's parts[0] is not the first part
+      // overall, so gate on nextIndex to avoid clobbering it.
+      if (nextIndex === 0) {
+        await updateJukeSpace(spaceId, { recording_url: parts[0].url });
+      }
+
       for (let i = 0; i < parts.length; i++) {
         const part = parts[i];
         try {
