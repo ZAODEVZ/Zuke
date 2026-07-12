@@ -381,3 +381,115 @@ codebase - same three as every prior run)
   older multi-provider Stage/Video-Room surface predating the Juke
   provider) or `HostRoomModal.tsx` - worth a look if Task A/B here are
   ever considered fully closed out.
+
+## Run 4 — 2026-07-12
+
+Read this file fully before starting. Local `main` had detached again
+(same recurring pattern as Runs 2-3) - fast-forwarded to `origin/main`
+(16 commits). Re-verified from a clean `npm install`: `build`, `lint`,
+`typecheck`, `test` (94/94) all pass clean before touching anything.
+
+### Correction to Run 3's "for next run" pointer
+
+`src/app/spaces/**` and `HostRoomModal.tsx`, flagged by Run 3 as unread,
+**do not exist anywhere in this repo** - confirmed via `find` and
+`git log --all --diff-filter=A` (empty history for both paths). That was
+a false lead, not a real gap. Not worth another look; nothing there to
+read.
+
+### Task A — still correctly ruled out (Run 1). Not redone.
+
+Re-verified `juke-api-reads.ts` directly this run: still only
+GET-by-id and DELETE-by-id for webhooks, no list-by-URL endpoint.
+Nothing has changed since Run 1's writeup - full automation is still
+blocked on Juke's API surface, not on engineering time in this repo.
+
+### Task B — this run's actual work
+
+1. **`src/app/api/juke/admin/mark-ended/route.ts` docstring was stale
+   relative to a sibling file in the same directory.** It claimed Juke's
+   developer end-space endpoint has "no spec for that yet, blocked on
+   Nicky" - false. `end-space/route.ts`, one directory entry away,
+   implements that exact endpoint (`POST /v1/developer/spaces/{id}/end`)
+   as shipped since 2026-05-24 (Nicky's PR #174), and
+   `jukeIntegrationManifest.ts` (fixed by Run 3) already confirms it
+   shipped. Rewrote the docstring to describe mark-ended's actual current
+   role: a local-only escape hatch (Juke unreachable, or the iframe Leave
+   button which never calls end-space at all), not the primary path.
+   Commit `a04dc9b`.
+
+2. **Dispatched one read-only sub-agent** (Explore) to sweep files not yet
+   closely read this week: admin console pages, the three juke/admin
+   routes I hadn't personally read yet (delete-webhook, mark-ended,
+   end-space - read those myself too, in parallel), all of
+   `src/app/api/auth/**` + `session.ts`, `env.ts`, `neynar.ts`,
+   `/live`/`/listen`/`/juke` page components, `src/components/spaces/**`,
+   `jukeChangelog.ts`, and the provider registry. It reported 3 candidate
+   findings; I independently re-verified every one against the real code
+   before fixing anything (per instructions - never trust a sub-agent
+   blindly). All three held up, and while verifying #2 I caught the
+   sub-agent's own suggested fix was itself insufficiently checked (see
+   below) and fixed it correctly instead:
+
+   - **`juke-status/page.tsx`**: the public "Subscribe to webhooks"
+     reference snippet (labelled as mirroring the live route) showed a
+     `"secret": "<JUKE_WEBHOOK_SECRET>"` field in the POST body -
+     `register-webhook/route.ts` never sends one (Juke generates + returns
+     it, rejects a client-supplied secret with 422, per that route's own
+     docstring and Run 1's script fix). Removed the field from the
+     snippet. Also removed a "Create one via /spaces (Go Live - Juke)"
+     link next to the correct `/live/create` link - `/spaces` doesn't
+     exist anywhere in the app (confirmed via grep + `find`), so it was a
+     dead duplicate of the working link right beside it.
+
+   - **`listen/page.tsx`**: a comment claimed the stale-room cron "only
+     runs daily on Hobby tier" and that some page "uses the same 30min
+     threshold" for a "Stale" badge. I verified both halves independently
+     before writing a fix, and both were wrong in ways the sub-agent's
+     report didn't fully capture: the cron actually runs every 30min
+     (`.github/workflows/juke-stale-rooms-cron.yml`'s own cron
+     expression, `*/30 * * * *`), its real staleness threshold is 2 hours
+     (`STALE_THRESHOLD_MINUTES = 120` in
+     `/api/cron/juke-stale-rooms/route.ts`), and - I checked - **no page
+     in the app has a "Stale" badge at all**, so that clause was
+     fabricated regardless of which route it named. Rewrote the comment
+     to describe the real cron cadence/threshold and this page's own
+     60min heuristic. Also fixed a footer link ("All audio surfaces")
+     pointing at `/spaces`; repointed to `/live`, the real dashboard
+     (confirmed via its own docstring: "the operator-facing dashboard
+     with finer controls").
+
+   - **`EndJukeSpaceButton.tsx`**: same stale "not shipped yet" framing
+     as finding #1 above, plus another `/spaces` reference. Fixed both -
+     end-space is shipped; the 404 fallback is for cross-app/iOS-native
+     rooms we don't own, not an unshipped endpoint; link is `/live`.
+
+   Commits: `4d2dc23`, `6f62d2d`, `f11a0c4`.
+
+All of build, lint, typecheck, and test (94/94) pass clean as of the
+last commit this run.
+
+### Explicitly not touched (confirmed blocked on someone outside this
+codebase - same three as every prior run)
+
+- `JUKE_USER_TOKEN` refresh flow
+- Recurring-event cron
+- Agent-in-Juke/ZOE auto-join
+
+### For the next run
+
+- `/spaces` was a genuinely dead route referenced in stale
+  comments/links across four files - all four are now fixed
+  (`mark-ended/route.ts` incidentally, by this run's docstring rewrite;
+  `juke-status/page.tsx`, `listen/page.tsx`, `EndJukeSpaceButton.tsx`
+  explicitly). Worth a final grep for `/spaces` next run just to confirm
+  no stray reference survived, but I believe this is now fully clean -
+  `grep -rn '"/spaces"' src` after this run's commits should return
+  nothing outside of legitimate substrings like
+  `/v1/developer/spaces/{id}` (Juke's real API path, not our route).
+- No further unaudited surface area comes to mind - Runs 1-4 combined
+  have now read essentially every route, doc, and component in
+  `src/app` and `src/lib/spaces`. If a Run 5 finds itself here with
+  nothing new via TODO/FIXME grep or targeted re-reads, it's fair to
+  conclude this repo's Task-B backlog is genuinely exhausted for now,
+  and to say so plainly rather than manufacture busywork.
