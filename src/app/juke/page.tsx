@@ -102,7 +102,7 @@ export default async function ZukeProductPage() {
             >
               ZAO OS
             </a>
-            {' '}lab. Fork, drop in 6 env vars, deploy.
+            {' '}lab. Fork, drop in a handful of env vars, deploy.
           </p>
           <div className="mt-8 flex flex-wrap gap-2">
             <a
@@ -174,7 +174,7 @@ export default async function ZukeProductPage() {
             <li>
               <strong className="text-white">No infra.</strong> Juke runs the
               LiveKit cluster, the iOS app, the iframe. You ship a Vercel
-              project + a Supabase + 6 env vars.
+              project + a Supabase + a handful of env vars.
             </li>
           </ul>
         </Section>
@@ -225,13 +225,15 @@ export default async function ZukeProductPage() {
                   <code className="text-[#a78bfa]">scripts/</code>:
                 </p>
                 <CodeBlock>{`scripts/juke-spaces-migration.sql
-scripts/juke-spaces-migration-2.sql`}</CodeBlock>
+scripts/juke-spaces-migration-2.sql
+scripts/juke-spaces-migration-3.sql
+scripts/juke-spaces-migration-4.sql`}</CodeBlock>
               </>
             }
           />
           <DeployStep
             num={3}
-            title="Set 6 env vars + register the webhook"
+            title="Set env vars + register the webhook"
             body={
               <>
                 <p className="text-sm text-gray-300">
@@ -250,8 +252,9 @@ scripts/juke-spaces-migration-2.sql`}</CodeBlock>
 SUPABASE_SERVICE_ROLE_KEY
 JUKE_API_KEY
 JUKE_WEBHOOK_SECRET   # filled by step-6 webhook register
-ZUKE_ADMIN_PASSWORD
-CRON_SECRET`}</CodeBlock>
+SESSION_SECRET        # 32+ chars, required for SIWF admin sessions
+ZUKE_ADMIN_FIDS       # comma-separated Farcaster FIDs allowed as admin
+CRON_SECRET           # also set as a GitHub Actions repo secret`}</CodeBlock>
                 <p className="text-xs text-gray-500 mt-2">
                   Deploy. Hit{' '}
                   <code className="text-[#a78bfa]">
