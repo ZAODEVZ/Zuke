@@ -107,8 +107,13 @@ export async function insertImportedSpace(input: ImportedSpaceInsert): Promise<v
   );
   if (error) {
     // provider column missing = migration #3 not applied; retry without it so
-    // the import still works on a partially-migrated DB.
-    if (/column .*provider/i.test(error.message)) {
+    // the import still works on a partially-migrated DB. PostgREST's actual
+    // schema-cache-miss message is "Could not find the 'provider' column of
+    // 'juke_spaces' in the schema cache" - the column name comes BEFORE the
+    // literal word "column", so a naive /column .*provider/i never matches
+    // real PostgREST output (only the inverse ordering). Match the same way
+    // recordingsDb.ts's isMissingTable does.
+    if (/provider/i.test(error.message) && /(does not exist|not find|schema cache)/i.test(error.message)) {
       const { error: retryError } = await sb.from('juke_spaces').upsert(
         {
           id: input.id,
@@ -349,7 +354,8 @@ export async function addParticipant(id: string, entry: JukeParticipantEntry): P
     .eq('id', id);
   if (error) {
     // Column missing = migration not applied yet. Do not block the webhook.
-    if (/column .*participants/i.test(error.message)) return;
+    // Same real-PostgREST-format fix as insertImportedSpace's provider check.
+    if (/participants/i.test(error.message) && /(does not exist|not find|schema cache)/i.test(error.message)) return;
     throw new Error(`addParticipant failed: ${error.message}`);
   }
 }
@@ -368,7 +374,7 @@ export async function removeParticipant(id: string, fid: number): Promise<void> 
     .update({ participants: next })
     .eq('id', id);
   if (error) {
-    if (/column .*participants/i.test(error.message)) return;
+    if (/participants/i.test(error.message) && /(does not exist|not find|schema cache)/i.test(error.message)) return;
     throw new Error(`removeParticipant failed: ${error.message}`);
   }
 }
