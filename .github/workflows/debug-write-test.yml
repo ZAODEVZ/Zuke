@@ -1,0 +1,21 @@
+name: TEMP - debug import-x write test
+
+# One-off manual trigger only (no schedule). Calls /api/cron/debug-write-test
+# to check whether production writes to juke_spaces work at all, without
+# needing a signed-in browser session. Reuses the CRON_SECRET/ZUKE_BASE_URL
+# secrets already set up for the stale-rooms poller.
+#
+# DELETE THIS WORKFLOW once the import-x incident is resolved - see
+# .handoffs/session-2026-07-13-zuke-import-x-500-debug/README.md.
+on:
+  workflow_dispatch: {}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call debug-write-test endpoint
+        run: |
+          curl --silent --show-error \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.ZUKE_BASE_URL }}/api/cron/debug-write-test"
