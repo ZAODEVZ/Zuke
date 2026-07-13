@@ -39,10 +39,14 @@ export function ImportXSpaceForm() {
       const body = (await res.json().catch(() => ({}))) as {
         ok?: boolean;
         error?: string;
+        // Admin-only debug detail from the server's caught DB error - see
+        // /api/recordings/import-x's catch block. Absent for non-admins.
+        detail?: string;
         spaceId?: string;
       };
       if (!res.ok || !body.ok || !body.spaceId) {
-        setState({ status: 'error', message: body.error ?? `Import failed (${res.status})` });
+        const base = body.error ?? `Import failed (${res.status})`;
+        setState({ status: 'error', message: body.detail ? `${base} - ${body.detail}` : base });
         return;
       }
       setState({ status: 'done', spaceId: body.spaceId });
