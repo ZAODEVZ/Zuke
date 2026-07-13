@@ -85,11 +85,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     });
   } catch (err: unknown) {
     logger.error('[recordings/import-x] insertImportedSpace failed', err);
-    // Surface the real DB error to admins only - this route swallowed it
-    // entirely before, which made a live production 500 undebuggable without
-    // Vercel log access. Non-admin signed-in users still get the generic
-    // message so raw Postgres internals never leak to a random FID.
-    const detail = session.isAdmin && err instanceof Error ? err.message : undefined;
+    // Surface the real DB error to any signed-in caller (this route already
+    // gates on sign-in for its main function - see Auth note above). Was
+    // admin-only at first, but the person actively debugging a live 500
+    // wasn't in ZUKE_ADMIN_FIDS, so that gate made the fix invisible to
+    // exactly the person who needed it. TODO: narrow back to admin-only once
+    // this specific incident is resolved - see .handoffs/session-2026-07-13-
+    // zuke-import-x-500-debug/README.md for context.
+    const detail = err instanceof Error ? err.message : undefined;
     return NextResponse.json(
       { ok: false, error: 'Could not import the Space', ...(detail ? { detail } : {}) },
       { status: 500 },
