@@ -22,7 +22,10 @@ bucket. See `docs/recap.md` for the recordings / snippets / recap-video flow.
 
 1. Go to juke.audio/developers
 2. Create a new API key for Zuke (separate key from ZAO OS)
-3. Note the `Webhook Secret` for incoming events
+
+There is no webhook secret to note here yet - Juke only generates that HMAC
+secret later, server-side, when you register a webhook subscription (Step
+4), and returns it exactly once in that response.
 
 ## Step 3 - Environment Variables
 
