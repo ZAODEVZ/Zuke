@@ -3258,3 +3258,110 @@ codebase - same three as every prior run)
   (Runs 8-19), `zukeConfig.brandColor` unused-but-correct config (Runs
   10-19), and the missing Supabase-mocking test infra for webhook-handler
   regression coverage (Run 20).
+
+## Run 24 — 2026-07-13
+
+Read this file fully before starting. Local checkout was HEAD-detached at
+Run 23's last commit (`e242863`), already equal to `origin/main` (0 commits
+behind since Run 23 - nothing landed in between). Checked out a tracking
+`main` branch pointed at it. Re-verified from a clean `npm install` (removed
+`node_modules` first): `build`, `lint`, `typecheck`, `test` (94/94) all pass
+clean before touching anything.
+
+### Task A - still correctly ruled out (Run 1). Not re-investigated this
+run; nothing prompted a re-check.
+
+### Task C - lightweight re-check per Run 19's established pattern
+(targeted grep/read of each item's key signal, not a full sub-agent
+dispatch); zero drift on all 4 items, fourteenth consecutive stable run
+(10-23, now 24)
+
+1. **Item 1 (SIWN)** - `ZUKE_ADMIN_PASSWORD` still only referenced in
+   `session.ts:48-53`'s explicitly opt-in legacy fallback block and
+   `env.ts`'s declaration. No change.
+2. **Item 2 (signer)** - `auto-cast.ts` still the unconditional stub (logs,
+   returns `null`). Repo-wide grep for "signer" across `src/`,
+   `setup-zuke.md`, `README.md` still turns up zero real credential
+   references anywhere - only the honest stub-caveat text every prior run
+   found. Still blocked on a @thezao Farcaster signer credential this
+   sandbox cannot provision or fake. No change.
+3. **Item 3 (custom domain)** - zero `zaoos.com` hits and zero non-test
+   `localhost` hits anywhere in `src/` (the one hit is
+   `providers.test.ts`'s legitimate fixture URL). Remains verified-done.
+4. **Item 4 (branding)** - `public/` still only the five unmodified
+   create-next-app SVGs; `favicon.ico` md5 still
+   `c30c7d42707a47a3f4591831641e50dc`, byte-identical to every prior run's
+   check. Still the one documented gap needing a human-provided design
+   asset.
+
+`setup-zuke.md`'s `## v1 Roadmap` section re-read: still correctly lists
+only items 2 and 4, with the shipped-domain note intact - matches all of
+the above. `README.md` still has no roadmap section (moved out per Run 6),
+confirmed via a fresh grep.
+
+### Fallback Task B sweep - dispatched one Explore sub-agent into a
+genuinely fresh angle: config/tooling files no prior run had individually,
+closely audited by name
+
+Targeted `tsconfig.json`, `eslint.config.mjs`, `vitest.config.ts` +
+`vitest.setup.ts`, a full `package.json` dependency/script cross-check
+(every dependency actually used vs. every import backed by a declared
+dependency), `.gitignore` (vs. `git ls-files` to confirm no `.env*`/build
+artifacts tracked), `next.config.ts` (re-check, last touched Run 6),
+`postcss.config.mjs`, and a fresh re-read of
+`.github/workflows/juke-stale-rooms-cron.yml` against the cron route's
+actual cadence/threshold/secret handling (last checked Run 3). **Zero
+findings** - every file's claims/config matched actual behavior; no
+undeclared imports, no unused dependencies, no stale comments. A `from
+"open"` package-name match the sub-agent initially flagged turned out to
+be a false positive (a prose comment in `jukeChangelog.ts`, not a real
+import) - checked and dismissed, not reported as a finding.
+
+Fresh TODO/FIXME/XXX/HACK grep across `src/` also turned up nothing new
+(same honestly-labelled `hms.ts` stub as every prior run).
+
+No code or doc changes made this run - nothing to fix. Re-ran build, lint,
+typecheck, and test (94/94) one more time after the sweep to confirm
+nothing drifted mid-run; all still pass clean. Only this log entry is
+being committed.
+
+### Explicitly not touched (confirmed blocked on someone outside this
+codebase - same three as every prior run)
+
+- `JUKE_USER_TOKEN` refresh flow
+- Recurring-event cron
+- Agent-in-Juke/ZOE auto-join (specifically the *unattended*/auto-join
+  piece - unchanged since Run 13, still blocked on both the VPS-side
+  session-token consumer and `allow_agents` not being exposed on the real
+  create path, per Run 16)
+
+### For the next run
+
+- All 4 roadmap items remain in the same state Runs 10-23 left them: items
+  1 and 3 done, item 2 blocked on a @thezao Farcaster signer credential,
+  item 4's code-side gap fixed with the logo/favicon design asset itself
+  still the one open piece. Fourteenth consecutive stable run - the
+  lighter-weight re-check continues to hold up fine.
+- **Config/tooling files are now confirmed clean too**: combined with Run
+  21's full `src/` sweep and Run 22's full top-level-docs sweep, this run's
+  config/tooling sweep means essentially every category of file in this
+  repo (app code, lib code, docs, config, CI) has now been closely,
+  individually audited at least once with claims cross-checked against
+  real behavior. Three consecutive fully-clean fallback sweeps in a row
+  (21, 23, now 24 - with only Run 22 finding one small doc bug in between).
+  A future run that also finds nothing via a fresh grep should feel free to
+  say so plainly rather than force a finding - this repo's easy, findable
+  gaps genuinely appear exhausted. Worth rotating toward periodic
+  re-verification (confirm nothing has silently drifted) rather than
+  novel-territory hunting, unless new commits land that touch previously
+  unexamined surface.
+- Still-open, still-flagged items needing a human decision or credential,
+  unchanged this run: the @thezao signer credential (item 2), the
+  logo/favicon design asset (item 4), `NEYNAR_API_KEY`'s direct-`process.env`
+  read in `verify/route.ts` (normalization only, Run 19), `import-x/route.ts`'s
+  more-permissive-than-`/live/create` auth gate (Run 20, assumption not
+  confirmed product decision), the `allowAgents`/`record` defaults on
+  `/live/create` (Runs 16-17), `getSupabaseBrowser` unused-but-correct code
+  (Runs 8-19), `zukeConfig.brandColor` unused-but-correct config (Runs
+  10-19), and the missing Supabase-mocking test infra for webhook-handler
+  regression coverage (Run 20).
