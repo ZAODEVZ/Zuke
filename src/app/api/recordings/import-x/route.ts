@@ -85,7 +85,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     });
   } catch (err: unknown) {
     logger.error('[recordings/import-x] insertImportedSpace failed', err);
-    return NextResponse.json({ ok: false, error: 'Could not import the Space' }, { status: 500 });
+    // Surface the real DB error to admins only - this route swallowed it
+    // entirely before, which made a live production 500 undebuggable without
+    // Vercel log access. Non-admin signed-in users still get the generic
+    // message so raw Postgres internals never leak to a random FID.
+    const detail = session.isAdmin && err instanceof Error ? err.message : undefined;
+    return NextResponse.json(
+      { ok: false, error: 'Could not import the Space', ...(detail ? { detail } : {}) },
+      { status: 500 },
+    );
   }
 
   // Attach the audio as a recording if a URL was provided. Best-effort: the
