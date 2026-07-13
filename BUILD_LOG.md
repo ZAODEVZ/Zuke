@@ -3365,3 +3365,158 @@ codebase - same three as every prior run)
   (Runs 8-19), `zukeConfig.brandColor` unused-but-correct config (Runs
   10-19), and the missing Supabase-mocking test infra for webhook-handler
   regression coverage (Run 20).
+
+## Run 25 — 2026-07-13
+
+Read this file fully before starting. Local checkout was HEAD-detached at
+Run 24's last commit (`538d75d`), already equal to `origin/main` (0 commits
+behind since Run 24 - nothing landed in between). Checked out a tracking
+`main` branch pointed at it. Re-verified from a clean `npm install` (removed
+`node_modules` first): `build`, `lint`, `typecheck`, `test` (94/94) all pass
+clean before touching anything.
+
+### Task A - still correctly ruled out (Run 1). Not re-investigated this
+run; nothing prompted a re-check.
+
+### Task C - lightweight re-check per Run 19's established pattern
+(targeted grep/read of each item's key signal, not a full sub-agent
+dispatch); zero drift on all 4 items, fifteenth consecutive stable run
+(10-24, now 25)
+
+1. **Item 1 (SIWN)** - `ZUKE_ADMIN_PASSWORD` still only referenced in
+   `session.ts:48-53`'s explicitly opt-in legacy fallback block and
+   `env.ts`'s declaration. No change.
+2. **Item 2 (signer)** - `auto-cast.ts` still the unconditional stub (logs,
+   returns `null`). Repo-wide grep for "signer" across `src/`,
+   `setup-zuke.md`, `README.md` still turns up zero real credential
+   references anywhere - only the honest stub-caveat text every prior run
+   found. Still blocked on a @thezao Farcaster signer credential this
+   sandbox cannot provision or fake. No change.
+3. **Item 3 (custom domain)** - zero `zaoos.com` hits and zero non-test
+   `localhost` hits anywhere in `src/` (the one hit is
+   `providers.test.ts`'s legitimate fixture URL). Remains verified-done.
+4. **Item 4 (branding)** - `public/` still only the five unmodified
+   create-next-app SVGs; `favicon.ico` md5 still
+   `c30c7d42707a47a3f4591831641e50dc`, byte-identical to every prior run's
+   check. Still the one documented gap needing a human-provided design
+   asset.
+
+`setup-zuke.md`'s `## v1 Roadmap` section re-read: still correctly lists
+only items 2 and 4, with the shipped-domain note intact - matches all of
+the above.
+
+### Fallback Task B sweep - found and fixed a genuinely fresh angle no
+prior run had checked: `npm audit`
+
+Grepped this file for "audit"/"vulnerab" first to confirm this angle was
+actually unexamined across all 24 prior runs - it was (only unrelated hits
+for "code-audit loop" framing and "unaudited surface" phrasing, never an
+actual `npm audit` run). `npm install` had been reporting "9 vulnerabilities"
+in its own summary line every run since Run 1, but no run had ever looked at
+what they were.
+
+Ran `npm audit`: 11 findings (1 low, 4 moderate, 5 high, 1 critical) across
+`esbuild`, `js-yaml`, `postcss` (nested in `next`'s own bundled copy), `vite`,
+`vitest` (critical - arbitrary file read/execute via its UI server), and `ws`
+(nested under `ethers`/`viem`, pulled in transitively by
+`@farcaster/auth-client`).
+
+1. **Ran `npm audit fix` (non-force) first.** It resolved 5 of the 6 distinct
+   advisories (esbuild, js-yaml, vite, vitest-critical, one `ws` instance
+   under `ethers`) purely by bumping the lockfile to newer versions already
+   satisfying `package.json`'s existing semver ranges - confirmed via
+   `git diff package.json` showing zero changes, only `package-lock.json`.
+   Re-ran `build`, `lint`, `typecheck`, `test` (94/94) after applying it - all
+   still pass clean, so this was a safe, verified fix, not a blind dependency
+   bump. Committed alone (`b1530ca`) and pushed immediately, separate from
+   the two remaining findings below since it's a different risk class (zero
+   package.json/behavior change vs. two flagged-as-breaking suggestions that
+   need actual judgment).
+2. **The remaining 2 advisories (postcss moderate, `ws` high under
+   `viem`/`@farcaster/auth-client`) both only have `--force` fixes, and both
+   of npm's own suggested resolutions are non-viable, verified directly
+   rather than trusted from the audit tool's text:**
+   - `postcss <8.5.10`'s only vulnerable copy is `node_modules/next/node_modules/postcss`
+     - Next's own internally bundled dependency, not something reachable via
+     our `package.json`. Confirmed via `npm view next@16.2.6 dependencies`:
+     Next pins `postcss@8.4.31` itself; the latest published Next release is
+     `16.3.0-preview.5` (a canary, not viable to pin in production). `npm audit
+     fix --force`'s own suggested resolution is "install next@9.3.3" - seven
+     major versions backward, which would gut the entire app (this repo is
+     built against the Next 16 API surface per `AGENTS.md`'s own warning that
+     it isn't the Next.js of training-data vintage). Not a real fix path;
+     genuinely blocked on upstream Next.js shipping a non-canary release with
+     a newer bundled postcss.
+   - `ws 8.0.0 - 8.20.1`'s remaining instance is nested under `viem` (pinned to
+     `2.52.0` via this repo's own override, Run 1) via `@farcaster/auth-client`
+     via `@farcaster/auth-kit`. The advisory (`GHSA-96hv-2xvq-fx4p`, memory
+     exhaustion DoS "from tiny fragments and data chunks") describes a
+     WebSocket *server* being sent malicious frames by a connecting client.
+     Grepped `src/` for any `createPublicClient`/`webSocket(`/`wss:` usage -
+     zero hits; the only files importing `viem`/`@farcaster/auth-*` at all are
+     `AuthKitWrapper.tsx`, `AdminLoginButton.tsx`, and `verify/route.ts`, all
+     of which drive SIWF signature verification over the HTTP RPC transport
+     (`NEXT_PUBLIC_OPTIMISM_RPC_URL`, always an `https://` URL, per Run 6). `ws`
+     is installed as a transitive dependency but its vulnerable code path (a
+     WebSocket connection handling attacker-controlled frames) is never
+     exercised by this app's actual usage - low real-world exposure, not a
+     silent unreachable-but-still-should-fix gap. `npm audit fix --force`'s
+     own suggested resolution is "install @farcaster/auth-kit@0.8.1" - a
+     downgrade from this repo's actual required range (`^0.8.2`), so not a
+     real fix path either without first confirming Farcaster ships a newer
+     `auth-kit`/`auth-client` release with a non-vulnerable `viem`/`ws` chain
+     (checked `npm view @farcaster/auth-kit versions` - `0.8.2` is still the
+     latest published version).
+   Both left as-is with this reasoning recorded, rather than forcing a
+   downgrade that would either break the build (postcss/next) or violate the
+   repo's own declared dependency requirement (ws/auth-kit) to silence an
+   audit warning with negligible real exposure. This is the same "don't fake
+   progress" bar every previously-blocked item in this log has been held to
+   - the difference here is these two are re-checkable on a normal cadence
+   (a new Next.js or `@farcaster/auth-kit` release could resolve them for
+   free), not indefinitely blocked on a credential a human has to provision.
+
+Fresh TODO/FIXME/XXX/HACK grep across `src/` turned up nothing new (same
+honestly-labeled `hms.ts` stub as every prior run).
+
+All of build, lint, typecheck, and test (94/94) pass clean as of the last
+commit this run. Pushed to `origin/main`.
+
+### Explicitly not touched (confirmed blocked on someone outside this
+codebase - same three as every prior run)
+
+- `JUKE_USER_TOKEN` refresh flow
+- Recurring-event cron
+- Agent-in-Juke/ZOE auto-join (specifically the *unattended*/auto-join
+  piece - unchanged since Run 13, still blocked on both the VPS-side
+  session-token consumer and `allow_agents` not being exposed on the real
+  create path, per Run 16)
+
+### For the next run
+
+- All 4 roadmap items remain in the same state Runs 10-24 left them: items
+  1 and 3 done, item 2 blocked on a @thezao Farcaster signer credential,
+  item 4's code-side gap fixed with the logo/favicon design asset itself
+  still the one open piece. Fifteenth consecutive stable run - the
+  lighter-weight re-check continues to hold up fine.
+- **`npm audit` is now a checked surface for the first time across 25 runs.**
+  5 of the original 11 findings are fixed for good (lockfile-only, verified
+  build/lint/typecheck/test green). The remaining 2 (postcss-in-next,
+  ws-in-viem) are genuinely not actionable from this sandbox today without
+  either breaking the build or violating a declared dependency range - but
+  unlike the signer/logo gaps, these are re-checkable for free: worth running
+  `npm audit` again periodically (e.g. every ~10 runs, or whenever `npm
+  install`'s own vulnerability count in its summary line changes) in case
+  Next.js or `@farcaster/auth-kit` ship a release that resolves them upstream.
+- Still-open, still-flagged items needing a human decision or credential,
+  unchanged this run: the @thezao signer credential (item 2), the
+  logo/favicon design asset (item 4), `NEYNAR_API_KEY`'s direct-`process.env`
+  read in `verify/route.ts` (normalization only, Run 19), `import-x/route.ts`'s
+  more-permissive-than-`/live/create` auth gate (Run 20, assumption not
+  confirmed product decision), the `allowAgents`/`record` defaults on
+  `/live/create` (Runs 16-17), `getSupabaseBrowser` unused-but-correct code
+  (Runs 8-19), `zukeConfig.brandColor` unused-but-correct config (Runs
+  10-19), the missing Supabase-mocking test infra for webhook-handler
+  regression coverage (Run 20), and the 2 remaining `npm audit` findings
+  above (postcss-in-next, ws-in-viem - both upstream-blocked, not engineering
+  gaps in this repo).
