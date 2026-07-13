@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { constantTimeEqual } from '@/lib/auth/constantTimeEqual';
 import { supabaseAdmin } from '@/lib/db/supabase';
 import { ENV } from '@/lib/env';
 import { logger } from '@/lib/logger';
@@ -40,8 +41,8 @@ export async function GET(request: NextRequest) {
       { status: 500 },
     );
   }
-  const authHeader = request.headers.get('authorization');
-  if (authHeader !== `Bearer ${cronSecret}`) {
+  const authHeader = request.headers.get('authorization') ?? '';
+  if (!constantTimeEqual(authHeader, `Bearer ${cronSecret}`)) {
     return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
   }
 

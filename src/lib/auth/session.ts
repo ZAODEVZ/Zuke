@@ -1,6 +1,7 @@
 import { cache } from 'react';
 import { getIronSession, IronSession } from 'iron-session';
 import { cookies } from 'next/headers';
+import { constantTimeEqual } from '@/lib/auth/constantTimeEqual';
 import { ENV } from '@/lib/env';
 
 export interface SessionPayload {
@@ -50,7 +51,7 @@ export const getSessionData = cache(async (): Promise<SessionData | null> => {
   if (ENV.ZUKE_ADMIN_PASSWORD) {
     const cookieStore = await cookies();
     const legacy = cookieStore.get('zuke_admin');
-    if (legacy?.value === ENV.ZUKE_ADMIN_PASSWORD) {
+    if (legacy?.value && constantTimeEqual(legacy.value, ENV.ZUKE_ADMIN_PASSWORD)) {
       return {
         fid: 0,
         username: 'legacy-admin',
