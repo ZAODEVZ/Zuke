@@ -3007,3 +3007,140 @@ codebase - same three as every prior run)
   (Runs 8-19), `zukeConfig.brandColor` unused-but-correct config (Runs
   10-19), and the missing Supabase-mocking test infra for webhook-handler
   regression coverage (Run 20).
+
+## Run 22 — 2026-07-13
+
+Read this file fully before starting. Local checkout was HEAD-detached at
+Run 21's last commit (`f2dfecc`), already equal to `origin/main` (0 commits
+behind since Run 21 - nothing landed in between) - checked out a tracking
+`main` branch pointed at it. Re-verified from a clean `npm install` (removed
+`node_modules` first): `build`, `lint`, `typecheck`, `test` (94/94) all pass
+clean before touching anything.
+
+### Task A - still correctly ruled out (Run 1). Not re-investigated this
+run; nothing prompted a re-check.
+
+### Task C - full re-verification of all 4 roadmap items against real code
+(per the task's own instructions, not just trusting the roadmap list or
+prior runs' notes); zero drift on all 4, twelfth consecutive stable run
+(10-21, now 22)
+
+1. **Item 1 (SIWN)** - re-grepped `ZUKE_ADMIN_PASSWORD` repo-wide: still
+   only referenced in `session.ts:48-53`'s explicitly opt-in, clearly
+   labelled-for-removal legacy fallback block (`if (ENV.ZUKE_ADMIN_PASSWORD)`
+   gating a `zuke_admin` cookie check) and `env.ts`'s declaration. Confirmed
+   `/live/create`'s real backing route (`POST /api/juke/space`) is
+   authorised by an admin *session* (SIWF + FID allowlist) or the separate,
+   differently-scoped `JUKE_CREATE_PASSWORD` shared-team password - not the
+   legacy admin password at all. SIWF/SIWN is the real, complete admin gate;
+   the admin password is legacy/unused on the primary path. No further
+   wiring needed, nothing to build. No change.
+2. **Item 2 (signer)** - re-read `auto-cast.ts` end-to-end: still an
+   unconditional stub (logs, returns `null`, no branch on any env var).
+   Re-grepped `env.ts` for "signer" - zero hits. No @thezao Farcaster signer
+   credential exists anywhere in this repo, its docs, or env var references
+   to build a real integration against. Still correctly blocked, same
+   category as the three explicitly-excluded items. No change.
+3. **Item 3 (custom domain)** - re-read `zuke.config.ts`'s `getBaseUrl()`
+   resolution order and re-confirmed both of its two real consumers
+   (`register-webhook/route.ts`, `jukeWebhookHandlers.ts`) are consistent
+   with it. Zero `zaoos.com` hits and zero non-test `localhost` hits
+   anywhere in `src/`. Independently verified live in production tonight per
+   the human owner's note (HTTP 200 on `zuke.thezao.com`) - matches the
+   code-side picture exactly (Vercel's own production-alias env vars
+   resolving to the custom domain, with `NEXT_PUBLIC_SITE_URL` available to
+   pin it explicitly). Remains verified-done; nothing further to invent.
+4. **Item 4 (branding)** - `public/` still only the five unmodified
+   create-next-app SVGs; `src/app/favicon.ico` md5 still
+   `c30c7d42707a47a3f4591831641e50dc`, byte-identical to every prior run's
+   check (including Run 10's original byte count). Re-confirmed (per Run
+   11's clarification of what "product surfaces" means) that every
+   remaining "ZAO" string in the UI legitimately refers to the ZAO
+   community/org (e.g. "ZAO Live", "ZAO dev", "ZAO holds three tables"), not
+   a rebrand miss - root layout metadata (Run 10's fix) still says
+   `${zukeConfig.name} - live audio for Farcaster communities`. Still no
+   logo/favicon design asset anywhere in this repo, and none can be
+   fabricated from this sandbox - documenting as still-missing rather than
+   faking a placeholder, same treatment every prior run gave this gap.
+
+`setup-zuke.md`'s `## v1 Roadmap` section re-read: still correctly lists
+only items 2 and 4, with the shipped-domain note intact - matches all of
+the above.
+
+### Fallback Task B sweep - found and fixed one genuine, previously-missed
+doc bug via a fresh full read of the top-level docs (README.md,
+setup-zuke.md, docs/recap.md), the angle Run 21 flagged as not yet tried
+from scratch (Run 21's own sweep was `src/`-only)
+
+**`setup-zuke.md` Step 2 told a deployer to "Note the `Webhook Secret` for
+incoming events" when creating the Juke API key on juke.audio/developers -
+but no webhook secret exists at that point.** Verified directly against
+`register-webhook/route.ts`'s own docstring (unchanged since Run 1): "Juke
+generates the HMAC secret server-side ... and returns it ONCE in the
+response body" - specifically in the `POST /v1/developer/webhooks`
+response, which is Step 4 of this same doc, not Step 2. Grepped the whole
+repo for "Webhook Secret"/"webhook secret" - the only other hit is this
+run's own BUILD_LOG note about Run 1's finding; nothing backs Step 2's
+claim that a secret exists at API-key-creation time. A deployer following
+Step 2 literally would go looking for a field on Juke's developer dashboard
+that (per every other doc and the code in this repo) doesn't exist until
+they actually register a webhook. Fixed Step 2 to drop the false
+instruction and instead say plainly that the secret doesn't exist yet,
+pointing at Step 4 for where it actually comes from. Commit `4d83d17`.
+
+Everything else read closely this run held up on independent verification:
+`README.md`'s Architecture/Environment Variables sections (all claims
+cross-checked against current code); `setup-zuke.md`'s Step 3 env var list
+and Verification section (the "webhook status view" claim in Verification
+step 3 does correspond to a real `WebhookTimelineSection` on
+`/juke-status`); `docs/recap.md` end-to-end against
+`recap/route.ts`'s actual JSON shape, `RecordingsManager.tsx`'s "Recap
+inputs" button (confirmed rendered on `/live/[spaceId]` via
+`RecordingsManager`), and the multi-part/legacy `recording_url` claim
+(matches Run 20's fix). Fresh TODO/FIXME/stub/XXX/HACK grep across `src/`
+turned up nothing new (same honestly-labelled `hms.ts` stub as every prior
+run). Fresh unquoted-and-quoted `/spaces` dead-route grep across `src/`,
+`README.md`, and `setup-zuke.md` came back with only legitimate substrings
+(Juke's real `/v1/developer/spaces` API path, `x.com/i/spaces/` links,
+`src/lib/spaces/` paths) - the Run 4/8 cleanup still holds.
+
+All of build, lint, typecheck, and test (94/94) pass clean as of the last
+commit this run. Pushed to `origin/main`.
+
+### Explicitly not touched (confirmed blocked on someone outside this
+codebase - same three as every prior run)
+
+- `JUKE_USER_TOKEN` refresh flow
+- Recurring-event cron
+- Agent-in-Juke/ZOE auto-join (specifically the *unattended*/auto-join
+  piece - unchanged since Run 13, still blocked on both the VPS-side
+  session-token consumer and `allow_agents` not being exposed on the real
+  create path, per Run 16)
+
+### For the next run
+
+- All 4 roadmap items remain in the same state Runs 10-18 left them: items
+  1 and 3 done, item 2 blocked on a @thezao Farcaster signer credential,
+  item 4's code-side gap fixed with the logo/favicon design asset itself
+  still the one open piece. Twelfth consecutive stable run - the
+  lighter-weight re-check continues to hold up fine.
+- **`setup-zuke.md`'s Step 2/Step 4 webhook-secret sequencing is now fixed
+  and consistent** - Step 2 no longer implies a secret exists before Step 4
+  actually generates one. Worth a spot-check next run only if Juke's API
+  flow ever changes (e.g. if they start issuing secrets at key-creation
+  time).
+- CLAUDE.md/AGENTS.md (repo meta-config for AI agents, not product docs)
+  were skimmed this run but not treated as in-scope for the Task
+  C/doc-staleness audit - they describe agent behavior/context sources, not
+  product features, so there's nothing there to fact-check against
+  application code the way README/setup-zuke.md/docs/recap.md are.
+- Still-open, still-flagged items needing a human decision or credential,
+  unchanged this run: the @thezao signer credential (item 2), the
+  logo/favicon design asset (item 4), `NEYNAR_API_KEY`'s direct-`process.env`
+  read in `verify/route.ts` (normalization only, Run 19), `import-x/route.ts`'s
+  more-permissive-than-`/live/create` auth gate (Run 20, assumption not
+  confirmed product decision), the `allowAgents`/`record` defaults on
+  `/live/create` (Runs 16-17), `getSupabaseBrowser` unused-but-correct code
+  (Runs 8-19), `zukeConfig.brandColor` unused-but-correct config (Runs
+  10-19), and the missing Supabase-mocking test infra for webhook-handler
+  regression coverage (Run 20).
