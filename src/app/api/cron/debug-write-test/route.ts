@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { constantTimeEqual } from '@/lib/auth/constantTimeEqual';
 import { supabaseAdmin } from '@/lib/db/supabase';
+import { insertImportedSpace } from '@/lib/spaces/jukeSpacesDb';
 
 /**
  * GET /api/cron/debug-write-test — TEMPORARY. Not a real feature.
@@ -30,29 +31,22 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   const testId = `debug-write-test-${Date.now()}`;
-  const nowIso = new Date().toISOString();
 
-  const { error: insertError } = await supabaseAdmin.from('juke_spaces').upsert(
-    {
+  // Call the REAL function import-x uses (not a re-implementation), so this
+  // exercises the actual deployed fallback logic exactly as-is.
+  try {
+    await insertImportedSpace({
       id: testId,
       title: 'debug write test - safe to ignore/delete',
-      status: 'ended',
       provider: 'songjam',
-      created_by_fid: 0,
-      ended_at: nowIso,
+      createdByFid: 0,
       raw: { source: 'debug-write-test' },
-    },
-    { onConflict: 'id' },
-  );
-
-  if (insertError) {
+    });
+  } catch (err: unknown) {
     return NextResponse.json({
       ok: false,
-      stage: 'insert',
-      error_message: insertError.message,
-      error_code: (insertError as { code?: string }).code ?? null,
-      error_details: (insertError as { details?: string }).details ?? null,
-      error_hint: (insertError as { hint?: string }).hint ?? null,
+      stage: 'insertImportedSpace',
+      error_message: err instanceof Error ? err.message : String(err),
     });
   }
 
@@ -60,7 +54,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   return NextResponse.json({
     ok: true,
-    inserted: true,
+    inserted_via_real_function: true,
     deleted: !deleteError,
     delete_error: deleteError ? deleteError.message : null,
   });
