@@ -3144,3 +3144,117 @@ codebase - same three as every prior run)
   (Runs 8-19), `zukeConfig.brandColor` unused-but-correct config (Runs
   10-19), and the missing Supabase-mocking test infra for webhook-handler
   regression coverage (Run 20).
+
+## Run 23 — 2026-07-13
+
+Read this file fully before starting. Local checkout was HEAD-detached at
+Run 22's last logged commit (`70d31b6`), but `origin/main` had one commit
+past that: `eb10fb7` ("fix(db): missing-column fallback regex never matched
+real PostgREST errors"), authored directly by the human owner (not by any
+prior run) - `jukeSpacesDb.ts`'s `/column .*provider/i` and
+`/column .*participants/i` checks required the literal word "column" before
+the field name, but PostgREST's real schema-cache-miss message puts the
+field name first ("Could not find the 'X' column of 'Y' in the schema
+cache"), so the fallback path was structurally unreachable; caught live via
+a production 500 on `/api/recordings/import-x`. Fast-forwarded to
+`origin/main`, checked out a tracking `main` branch pointed at it. Re-verified
+from a clean `npm install` (removed `node_modules` first): `build`, `lint`,
+`typecheck`, `test` (94/94) all pass clean before touching anything.
+
+### Task A - still correctly ruled out (Run 1). Not re-investigated this
+run; nothing prompted a re-check.
+
+### Task C - lightweight re-check per Run 19's established pattern
+(targeted grep/read of each item's key signal, not a full sub-agent
+dispatch); zero drift on all 4 items, thirteenth consecutive stable run
+(10-22, now 23)
+
+1. **Item 1 (SIWN)** - `ZUKE_ADMIN_PASSWORD` still only referenced in
+   `session.ts:48-53`'s explicitly opt-in legacy fallback block and
+   `env.ts`'s declaration. No change.
+2. **Item 2 (signer)** - `auto-cast.ts` still the unconditional stub (logs,
+   returns `null`). Repo-wide grep for "signer" across `src/`,
+   `setup-zuke.md`, `README.md` still turns up zero real credential
+   references anywhere - only the honest stub-caveat text every prior run
+   found. Still blocked on a @thezao Farcaster signer credential this
+   sandbox cannot provision or fake. No change.
+3. **Item 3 (custom domain)** - zero `zaoos.com` hits and zero non-test
+   `localhost` hits anywhere in `src/`. Remains verified-done.
+4. **Item 4 (branding)** - `public/` still only the five unmodified
+   create-next-app SVGs; `favicon.ico` md5 still
+   `c30c7d42707a47a3f4591831641e50dc`, byte-identical to every prior run's
+   check. Still the one documented gap needing a human-provided design
+   asset.
+
+`setup-zuke.md`'s `## v1 Roadmap` section re-read: still correctly lists
+only items 2 and 4, with the shipped-domain note intact - matches all of
+the above.
+
+### Fallback Task B sweep - triggered by the new `eb10fb7` commit, since
+that's exactly the kind of surface change this run's instructions say
+should reopen a targeted check; came back clean
+
+Since `eb10fb7` touched `jukeSpacesDb.ts`'s error-message-matching fallback
+logic (a class of code no prior run had specifically scrutinized), dispatched
+one Explore sub-agent to check: (1) whether the same wrong-word-order regex
+bug exists anywhere else in `src/` beyond the two spots `eb10fb7` fixed, (2)
+whether any other migration-fallback code path has a similar untested
+string-matching bug, (3) whether `jukeIntegrationManifest.ts`/`docs/recap.md`/
+`README.md` make any claim about this fallback behavior that could now be
+inconsistent, and (4) failing all that, one fresh corner not already
+name-checked clean by Runs 21-22.
+
+I independently re-verified its one substantive claim myself before accepting
+it: `recordingsStorage.ts:85`'s `/bucket.*not.*found|not found/i` check
+against Supabase Storage's real missing-bucket error string
+(`"Bucket not found"` - field-name-first is not an issue here since "not
+found" already trails "Bucket" in the correct order) - confirmed this regex
+is not subject to the same bug class and needs no fix. **Zero findings
+overall**: the two regexes `eb10fb7` fixed were the only ones of their kind
+in the repo (`recordingsDb.ts`'s `isMissingTable`, the other fallback-regex
+call site, already used the correct field-first pattern and was untouched by
+the bug); the only other fallback checks in `src/lib/spaces/*.ts` key off a
+numeric Postgres error `code` (`23505`), not a message regex, so they're not
+in this bug class at all; no public doc/manifest anywhere mentions this
+internal degradation mechanism, so nothing could have drifted out of sync
+with the fix. No test exercises `insertImportedSpace`/`addParticipant`/
+`removeParticipant`'s fallback branches directly, but that's the same
+pre-existing Supabase-mocking test-infra gap Run 20 already logged, not a new
+finding.
+
+No code or doc changes made this run - nothing to fix. Re-ran build, lint,
+typecheck, and test (94/94) one more time after the sweep to confirm nothing
+drifted mid-run; all still pass clean. Only this log entry is being
+committed.
+
+### Explicitly not touched (confirmed blocked on someone outside this
+codebase - same three as every prior run)
+
+- `JUKE_USER_TOKEN` refresh flow
+- Recurring-event cron
+- Agent-in-Juke/ZOE auto-join (specifically the *unattended*/auto-join
+  piece - unchanged since Run 13, still blocked on both the VPS-side
+  session-token consumer and `allow_agents` not being exposed on the real
+  create path, per Run 16)
+
+### For the next run
+
+- All 4 roadmap items remain in the same state Runs 10-22 left them: items
+  1 and 3 done, item 2 blocked on a @thezao Farcaster signer credential,
+  item 4's code-side gap fixed with the logo/favicon design asset itself
+  still the one open piece. Thirteenth consecutive stable run - the
+  lighter-weight re-check continues to hold up fine.
+- `eb10fb7`'s error-message-regex fix is confirmed complete and isolated -
+  no sibling instances of the bug elsewhere in the repo, no doc claims to
+  reconcile. Nothing further to do here unless a future commit adds another
+  message-regex fallback check (worth the same word-order scrutiny if so).
+- Still-open, still-flagged items needing a human decision or credential,
+  unchanged this run: the @thezao signer credential (item 2), the
+  logo/favicon design asset (item 4), `NEYNAR_API_KEY`'s direct-`process.env`
+  read in `verify/route.ts` (normalization only, Run 19), `import-x/route.ts`'s
+  more-permissive-than-`/live/create` auth gate (Run 20, assumption not
+  confirmed product decision), the `allowAgents`/`record` defaults on
+  `/live/create` (Runs 16-17), `getSupabaseBrowser` unused-but-correct code
+  (Runs 8-19), `zukeConfig.brandColor` unused-but-correct config (Runs
+  10-19), and the missing Supabase-mocking test infra for webhook-handler
+  regression coverage (Run 20).
