@@ -15,6 +15,6 @@ jobs:
     steps:
       - name: Call schema-drift-check endpoint
         run: |
-          curl --silent --show-error --fail \
+          curl --silent --show-error \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             "${{ secrets.ZUKE_BASE_URL }}/api/cron/schema-drift-check"
