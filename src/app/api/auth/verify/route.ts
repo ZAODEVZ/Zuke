@@ -27,7 +27,7 @@ async function fetchNeynarProfile(fid: number): Promise<{
   displayName: string;
   pfpUrl: string;
 } | null> {
-  const key = process.env.NEYNAR_API_KEY;
+  const key = ENV.NEYNAR_API_KEY;
   if (!key) return null;
   try {
     const res = await fetch(

@@ -118,6 +118,40 @@ vercel --prod
    the deployment sees Juke as configured
 2. Create a room via `/live/create` to verify Juke integration end to end
 3. Check webhook delivery in the webhook status view
+4. `GET /api/health` should return `{ ok: true, db: 'reachable' }` - point an
+   external uptime monitor here, not at `/api/juke/status` (that one swallows
+   dependency failures and always returns 200)
+
+## Rollback
+
+No automated rollback tooling exists (documented here since the 2026-07
+prod-readiness audit flagged this as missing - a runbook is the minimum
+viable version, not a substitute for real tooling later).
+
+**Bad deploy (code):**
+1. Vercel dashboard -> zuke project -> Deployments -> find the last known-good
+   deployment -> "..." menu -> Promote to Production. Instant, no rebuild.
+2. Or: `git revert <bad-commit>`, push to `main` - triggers a normal redeploy.
+
+**Bad migration (schema):**
+There is no automated migration rollback - `scripts/juke-spaces-migration-*.sql`
+are additive-only by design (new nullable columns / new tables, see each
+file's header comment) specifically so a bad migration rarely needs a real
+down-migration. If one does:
+1. Write a new `scripts/juke-spaces-migration-N.sql` that undoes the specific
+   change (e.g. `alter table ... drop column ...`) - do not edit a past
+   migration file in place, the same way you wouldn't force-push a shared branch.
+2. Run it manually against the Supabase SQL editor (same manual process as
+   applying any migration here - see Step 1).
+3. Run `GET /api/cron/schema-drift-check` (CRON_SECRET-gated) afterward to
+   confirm the schema matches what the code expects again.
+
+**Bad migration that was never applied (this is what actually happened in
+2026-07):** the code shipped assuming a column existed that didn't. Symptom is
+usually a `PGRST204`/`42P01` error surfacing as a generic 500. `GET
+/api/cron/schema-drift-check` checks for exactly this drift on a 6-hour
+schedule (`.github/workflows/schema-drift-check.yml`) - a failed run there
+means a migration file was merged but never actually run against production.
 
 ## v1 Roadmap
 
