@@ -4,6 +4,7 @@ import { constantTimeEqual } from '@/lib/auth/constantTimeEqual';
 import { getSessionData } from '@/lib/auth/session';
 import { ENV } from '@/lib/env';
 import { logger } from '@/lib/logger';
+import { checkRateLimit } from '@/lib/rateLimit';
 import { getLiveAudioProvider } from '@/lib/spaces/providers';
 import { insertJukeSpace } from '@/lib/spaces/jukeSpacesDb';
 
@@ -51,6 +52,14 @@ const createSpaceSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  const rateLimit = checkRateLimit(request, 'juke/space', { max: 10, windowMs: 60_000 });
+  if (rateLimit.limited) {
+    return NextResponse.json(
+      { success: false, error: 'Too many requests, slow down' },
+      { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } },
+    );
+  }
+
   let raw: unknown;
   try {
     raw = await request.json();

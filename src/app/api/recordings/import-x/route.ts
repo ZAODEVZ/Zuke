@@ -5,6 +5,7 @@ import { logger } from '@/lib/logger';
 import { insertImportedSpace } from '@/lib/spaces/jukeSpacesDb';
 import { insertRecording } from '@/lib/spaces/recordingsDb';
 import { parseXSpaceUrl, X_SPACE_PROVIDER } from '@/lib/spaces/xSpaces';
+import { checkRateLimit } from '@/lib/rateLimit';
 
 /**
  * POST /api/recordings/import-x — import a past X (Twitter) Space into Zuke.
@@ -40,6 +41,14 @@ const bodySchema = z.object({
 });
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  const rateLimit = checkRateLimit(request, 'recordings/import-x', { max: 5, windowMs: 60_000 });
+  if (rateLimit.limited) {
+    return NextResponse.json(
+      { ok: false, error: 'Too many import attempts, slow down' },
+      { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } },
+    );
+  }
+
   const session = await getSessionData();
   if (!session?.fid && !session?.isAdmin) {
     return NextResponse.json({ ok: false, error: 'Sign in required' }, { status: 401 });

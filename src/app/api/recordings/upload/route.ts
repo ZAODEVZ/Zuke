@@ -10,6 +10,7 @@ import {
   MAX_UPLOAD_BYTES,
   uploadRecordingFile,
 } from '@/lib/spaces/recordingsStorage';
+import { checkRateLimit } from '@/lib/rateLimit';
 
 /**
  * POST /api/recordings/upload — attach an uploaded audio file to a space.
@@ -34,6 +35,14 @@ const fieldsSchema = z.object({
 });
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  const rateLimit = checkRateLimit(request, 'recordings/upload', { max: 10, windowMs: 60_000 });
+  if (rateLimit.limited) {
+    return NextResponse.json(
+      { ok: false, error: 'Too many uploads, slow down' },
+      { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } },
+    );
+  }
+
   const session = await getSessionData();
   if (!session?.fid && !session?.isAdmin) {
     return NextResponse.json({ ok: false, error: 'Sign in required' }, { status: 401 });

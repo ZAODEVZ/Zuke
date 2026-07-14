@@ -4,6 +4,7 @@ import { getSessionData } from '@/lib/auth/session';
 import { logger } from '@/lib/logger';
 import { getJukeSpace } from '@/lib/spaces/jukeSpacesDb';
 import { countRecordingsForSpace, getRecording, insertRecording } from '@/lib/spaces/recordingsDb';
+import { checkRateLimit } from '@/lib/rateLimit';
 
 /**
  * POST /api/recordings/snippet — create a snippet (clip) of an existing
@@ -32,6 +33,14 @@ const bodySchema = z
   });
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  const rateLimit = checkRateLimit(request, 'recordings/snippet', { max: 20, windowMs: 60_000 });
+  if (rateLimit.limited) {
+    return NextResponse.json(
+      { ok: false, error: 'Too many snippets, slow down' },
+      { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } },
+    );
+  }
+
   const session = await getSessionData();
   if (!session?.fid && !session?.isAdmin) {
     return NextResponse.json({ ok: false, error: 'Sign in required' }, { status: 401 });
