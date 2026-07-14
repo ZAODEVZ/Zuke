@@ -1,0 +1,32 @@
+name: CI
+
+# Runs lint/typecheck/test/build on every push and PR. Before this workflow,
+# .github/workflows/ only had two operational cron jobs - nothing gated what
+# actually reached main, so a broken build or a failing test could merge and
+# auto-deploy via Vercel unchecked.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+        env:
+          # Build-time only, unused by real routes - lets `next build` static
+          # analysis pass without real secrets. Never used for a real request.
+          NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ci-placeholder
+          SESSION_SECRET: ci-placeholder-session-secret-32-characters-minimum
