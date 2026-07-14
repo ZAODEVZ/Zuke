@@ -1,0 +1,20 @@
+name: Schema drift check
+
+# Runs the migration drift detector on a schedule (see
+# src/app/api/cron/schema-drift-check/route.ts for what it actually checks
+# and why it exists) plus on-demand. A failed run here means a migration
+# file in scripts/*.sql was merged but never applied to production.
+on:
+  schedule:
+    - cron: '0 */6 * * *' # every 6 hours
+  workflow_dispatch: {}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call schema-drift-check endpoint
+        run: |
+          curl --silent --show-error --fail \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.ZUKE_BASE_URL }}/api/cron/schema-drift-check"
