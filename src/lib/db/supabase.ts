@@ -13,11 +13,16 @@ import { ENV } from '@/lib/env';
 let supabaseAdminInstance: SupabaseClient | null = null;
 
 function buildClient(): SupabaseClient {
-  return createClient(
-    ENV.SUPABASE_URL || 'https://placeholder.supabase.co',
-    ENV.SUPABASE_SERVICE_ROLE_KEY || 'placeholder',
-    { auth: { autoRefreshToken: false, persistSession: false } },
-  );
+  if (!ENV.SUPABASE_URL || !ENV.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error(
+      'Supabase admin client requires NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY. ' +
+        'A silent placeholder fallback here previously masked a real "wrong/missing credential" ' +
+        'as unrelated-looking DB errors (see the 2026-07 import-x incident) - fail loudly instead.',
+    );
+  }
+  return createClient(ENV.SUPABASE_URL, ENV.SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
 }
 
 export function getSupabaseAdmin(): SupabaseClient {
