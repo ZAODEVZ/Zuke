@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { SignInButton, type StatusAPIResponse } from '@farcaster/auth-kit';
+import type { AuthClientError } from '@farcaster/auth-client';
 import { useRouter } from 'next/navigation';
 
 export function AdminLoginButton() {
@@ -67,11 +68,34 @@ export function AdminLoginButton() {
     [router],
   );
 
+  // auth-kit's own relay/QR handshake (channel creation + polling) runs
+  // entirely client-side before onSuccess ever fires - a relay failure there
+  // previously surfaced as a bare "Sign in failed" with zero diagnostic
+  // detail, since only onSuccess was wired. onError exposes the real
+  // AuthClientError (errCode + message); onStatusResponse logs each relay
+  // poll so a hang/timeout is visible in the console instead of silent.
+  const handleError = useCallback((err?: AuthClientError) => {
+    console.error('[admin/login] auth-kit relay error:', err?.errCode, err?.message, err);
+    setError(
+      err ? `Sign-in failed: ${err.errCode} - ${err.message}` : 'Sign-in failed (no error detail from relay).',
+    );
+    setLoading(false);
+  }, []);
+
+  const handleStatusResponse = useCallback((statusData: StatusAPIResponse) => {
+    console.log('[admin/login] relay status:', statusData.state);
+  }, []);
+
   return (
     <div className="w-full max-w-sm mx-auto flex flex-col items-center gap-4">
       <div className="farcaster-signin-wrapper" key={serverNonce || 'loading'}>
         {serverNonce ? (
-          <SignInButton nonce={serverNonce} onSuccess={handleSuccess} />
+          <SignInButton
+            nonce={serverNonce}
+            onSuccess={handleSuccess}
+            onError={handleError}
+            onStatusResponse={handleStatusResponse}
+          />
         ) : (
           <div className="h-10 w-48 rounded-lg bg-gray-800 animate-pulse" />
         )}
