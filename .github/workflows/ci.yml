@@ -1,9 +1,10 @@
 name: CI
 
-# Runs lint/typecheck/test/build on every push and PR. Before this workflow,
-# .github/workflows/ only had two operational cron jobs - nothing gated what
-# actually reached main, so a broken build or a failing test could merge and
-# auto-deploy via Vercel unchecked.
+# Runs lint/typecheck/test/build (job `ci`) and E2E smoke tests (job `e2e`)
+# on every push and PR. Before this workflow, .github/workflows/ only had two
+# operational cron jobs - nothing gated what actually reached main, so a
+# broken build or a failing test could merge and auto-deploy via Vercel
+# unchecked.
 on:
   push:
     branches: [main]
@@ -30,3 +31,15 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: ci-placeholder
           SESSION_SECRET: ci-placeholder-session-secret-32-characters-minimum
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run e2e
