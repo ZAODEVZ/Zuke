@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
     }
     const { message, signature, nonce, domain } = parsed.data;
 
-    const nonceCheck = consumeNonce(nonce);
+    const nonceCheck = await consumeNonce(nonce);
     if (!nonceCheck.ok) {
       return NextResponse.json(
         { error: `Invalid nonce: ${nonceCheck.reason}. Please try signing in again.` },
