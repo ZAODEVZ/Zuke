@@ -1,0 +1,12 @@
+name: TEMP - verify juke create
+on:
+  workflow_dispatch: {}
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call verify-juke-create endpoint
+        run: |
+          curl --silent --show-error \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.ZUKE_BASE_URL }}/api/cron/verify-juke-create"
