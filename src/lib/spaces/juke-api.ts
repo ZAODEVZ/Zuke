@@ -167,10 +167,14 @@ export async function createJukeSpace(
   }
 
   if (!response.ok) {
+    // Surface Juke's actual response body instead of discarding it - a
+    // generic "Juke API returned 422" gives no way to diagnose a real
+    // validation failure without this.
+    const bodyText = (await response.text().catch(() => '')).slice(0, 500);
     return {
       ok: false,
       status: response.status,
-      error: `Juke API returned ${response.status}`,
+      error: `Juke API returned ${response.status}${bodyText ? `: ${bodyText}` : ''}`,
     };
   }
 

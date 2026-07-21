@@ -64,11 +64,12 @@ describe('createJukeSpace', () => {
     vi.unstubAllGlobals();
   });
 
-  function mockFetchOnce(init: { ok: boolean; status: number; json: () => unknown }) {
+  function mockFetchOnce(init: { ok: boolean; status: number; json: () => unknown; text?: string }) {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: init.ok,
       status: init.status,
       json: async () => init.json(),
+      text: async () => init.text ?? JSON.stringify(init.json()),
     } as Response);
   }
 
@@ -164,6 +165,36 @@ describe('createJukeSpace', () => {
     if (!result.ok) {
       expect(result.status).toBe(401);
       expect(result.error).toMatch(/401/);
+    }
+  });
+
+  it('includes Juke\'s actual response body in the error, not just the status', async () => {
+    mockFetchOnce({
+      ok: false,
+      status: 422,
+      json: () => ({ error: 'validation_failed', detail: 'title too long' }),
+      text: '{"error":"validation_failed","detail":"title too long"}',
+    });
+
+    const result = await createJukeSpace({ title: 'ZAO Live' }, CREDS);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.status).toBe(422);
+      expect(result.error).toContain('422');
+      expect(result.error).toContain('title too long');
+    }
+  });
+
+  it('truncates an oversized error body to 500 chars', async () => {
+    const huge = 'x'.repeat(2000);
+    mockFetchOnce({ ok: false, status: 500, json: () => ({}), text: huge });
+
+    const result = await createJukeSpace({ title: 'ZAO Live' }, CREDS);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.length).toBeLessThan(600);
     }
   });
 
