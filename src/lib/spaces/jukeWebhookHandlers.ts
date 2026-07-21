@@ -182,6 +182,37 @@ function readNativeRoomMeta(body: unknown): NativeRoomMeta {
 }
 
 /**
+ * Poll Juke for a native room's recording and attach it if ready. Native
+ * rooms never fire recording.ready at all (Juke's docs are explicit) - this
+ * is the only way one ever gets attached. Shared by room.finished below
+ * (catches a recording already ready by the time the room ends) and
+ * /api/cron/juke-stale-rooms (catches one that was still processing then -
+ * see that route for the recheck window). Idempotent: insertRecording
+ * dedupes on (space_id, url) for source='juke', so calling this twice for
+ * the same finished recording is a safe no-op the second time.
+ */
+export async function pollAndAttachNativeRecording(spaceId: string): Promise<{ attached: boolean }> {
+  const detail = await getJukeRoomDetail(spaceId, ENV.JUKE_API_KEY);
+  if (!detail.ok || !detail.data?.recording_url) return { attached: false };
+
+  const recordingUrl = detail.data.recording_url;
+  const nextIndex = await countRecordingsForSpace(spaceId).catch(() => 0);
+  if (nextIndex === 0) {
+    await updateJukeSpace(spaceId, { recording_url: recordingUrl });
+  }
+  await insertRecording({
+    spaceId,
+    url: recordingUrl,
+    source: 'juke',
+    provider: 'juke',
+    partIndex: nextIndex,
+    title: null,
+    durationSeconds: null,
+  });
+  return { attached: true };
+}
+
+/**
  * Backfill a juke_spaces row the first time Zuke sees ANY event for a
  * Farcaster-native room (one Zuke did not create via its own
  * POST /v1/developer/spaces call - e.g. a space hosted directly in Warpcast).
@@ -287,28 +318,14 @@ export async function applyWebhookEvent(
 
       // Native rooms never fire recording.ready (Juke's docs are explicit
       // about this) - poll once for a recording instead. This only catches a
-      // recording that's already ready by the time room.finished arrives; a
-      // recording Juke is still processing needs a later recheck (not built
-      // yet - a natural extension of the juke-stale-rooms cron).
+      // recording that's already ready by the time room.finished arrives;
+      // /api/cron/juke-stale-rooms rechecks recently-ended native rooms with
+      // no recording yet for the still-processing case.
       if (nativeMeta.isNative) {
         try {
-          const detail = await getJukeRoomDetail(spaceId, ENV.JUKE_API_KEY);
-          if (detail.ok && detail.data?.recording_url) {
-            const nextIndex = await countRecordingsForSpace(spaceId).catch(() => 0);
-            if (nextIndex === 0) {
-              await updateJukeSpace(spaceId, { recording_url: detail.data.recording_url });
-            }
-            await insertRecording({
-              spaceId,
-              url: detail.data.recording_url,
-              source: 'juke',
-              provider: 'juke',
-              partIndex: nextIndex,
-              title: null,
-              durationSeconds: null,
-            });
-          } else {
-            logger.info('[juke/webhooks] native room finished, no recording yet - needs a later recheck', {
+          const { attached } = await pollAndAttachNativeRecording(spaceId);
+          if (!attached) {
+            logger.info('[juke/webhooks] native room finished, no recording yet - cron will recheck', {
               spaceId,
             });
           }

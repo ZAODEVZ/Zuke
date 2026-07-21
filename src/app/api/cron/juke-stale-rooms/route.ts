@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/lib/db/supabase';
 import { ENV } from '@/lib/env';
 import { logger } from '@/lib/logger';
 import { getJukeRoomDetail } from '@/lib/spaces/juke-api-reads';
+import { pollAndAttachNativeRecording } from '@/lib/spaces/jukeWebhookHandlers';
 
 /**
  * GET /api/cron/juke-stale-rooms
@@ -23,6 +24,15 @@ import { getJukeRoomDetail } from '@/lib/spaces/juke-api-reads';
  * Idempotent: a real room.finished webhook arriving later for the same
  * spaceId is a no-op since the row is already ended.
  *
+ * Second sweep: native rooms (hosted directly via Farcaster, not through
+ * Zuke's own create-space call) never fire recording.ready at all - Juke's
+ * docs are explicit about this. room.finished's handler polls once for a
+ * recording, but a recording still processing at that moment is missed
+ * forever without a recheck. This sweep rechecks recently-ended native
+ * rooms with no recording yet, within a bounded window (not indefinitely -
+ * an ancient orphaned space with no recording is presumed to genuinely have
+ * none, not still-processing).
+ *
  * Auth: Bearer CRON_SECRET, sent by the GitHub Actions workflow below (not
  * a Vercel cron header - Vercel Cron isn't used here). Manual GETs from the
  * outside without the bearer get 401.
@@ -32,6 +42,7 @@ import { getJukeRoomDetail } from '@/lib/spaces/juke-api-reads';
  */
 
 const STALE_THRESHOLD_MINUTES = 120;
+const RECORDING_RECHECK_WINDOW_HOURS = 48;
 
 export async function GET(request: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
@@ -180,6 +191,40 @@ export async function GET(request: NextRequest) {
     { endedIds },
   );
 
+  // Second sweep: recently-ended native rooms still missing a recording -
+  // see the docstring above for why this can't just happen once in the
+  // room.finished handler. Needs the Juke API key the same way the
+  // authoritative check above does.
+  let recordingsRechecked = 0;
+  let recordingsAttached = 0;
+  if (useAuthoritative) {
+    const recheckWindowIso = new Date(
+      Date.now() - RECORDING_RECHECK_WINDOW_HOURS * 60 * 60 * 1000,
+    ).toISOString();
+    try {
+      const { data: needsRecheck, error } = await supabaseAdmin
+        .from('juke_spaces')
+        .select('id')
+        .eq('status', 'ended')
+        .is('recording_url', null)
+        .eq('raw->>is_farcaster_native', 'true')
+        .gte('ended_at', recheckWindowIso)
+        .limit(25);
+      if (error) throw error;
+      for (const row of (needsRecheck ?? []) as Array<{ id: string }>) {
+        recordingsRechecked += 1;
+        try {
+          const { attached } = await pollAndAttachNativeRecording(row.id);
+          if (attached) recordingsAttached += 1;
+        } catch (err: unknown) {
+          logger.warn('[cron/juke-stale-rooms] recording recheck failed for ' + row.id, err);
+        }
+      }
+    } catch (err: unknown) {
+      logger.warn('[cron/juke-stale-rooms] recording recheck query failed (non-fatal)', err);
+    }
+  }
+
   return NextResponse.json({
     ok: true,
     checked: candidates.length,
@@ -189,5 +234,7 @@ export async function GET(request: NextRequest) {
     heuristic_only: heuristicOnly,
     threshold_minutes: STALE_THRESHOLD_MINUTES,
     ended_ids: endedIds,
+    native_recordings_rechecked: recordingsRechecked,
+    native_recordings_attached: recordingsAttached,
   });
 }
