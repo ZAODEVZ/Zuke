@@ -169,12 +169,19 @@ export async function createJukeSpace(
   if (!response.ok) {
     // Surface Juke's actual response body instead of discarding it - a
     // generic "Juke API returned 422" gives no way to diagnose a real
-    // validation failure without this.
+    // validation failure without this. Also surface a few response headers
+    // (content-type, server) since an empty body on an error status can mean
+    // an intermediary (CDN/WAF) rejected the request before it ever reached
+    // Juke's own application code.
     const bodyText = (await response.text().catch(() => '')).slice(0, 500);
+    const contentType = response.headers.get('content-type') ?? '';
+    const server = response.headers.get('server') ?? '';
+    const via = response.headers.get('via') ?? '';
+    const headerHint = !bodyText ? ` [content-type=${contentType} server=${server} via=${via}]` : '';
     return {
       ok: false,
       status: response.status,
-      error: `Juke API returned ${response.status}${bodyText ? `: ${bodyText}` : ''}`,
+      error: `Juke API returned ${response.status}${bodyText ? `: ${bodyText}` : headerHint}`,
     };
   }
 

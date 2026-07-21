@@ -70,7 +70,8 @@ describe('createJukeSpace', () => {
       status: init.status,
       json: async () => init.json(),
       text: async () => init.text ?? JSON.stringify(init.json()),
-    } as Response);
+      headers: { get: () => null },
+    } as unknown as Response);
   }
 
   it('posts to the developer endpoint with the api key header only', async () => {
