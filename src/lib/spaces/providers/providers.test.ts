@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { jukeEmbedUrl, jukeSpaceUrl } from '../juke';
 import { hmsProvider } from './hms';
 import { jukeProvider } from './juke';
@@ -92,32 +92,63 @@ describe('juke provider', () => {
   });
 });
 
-describe('hms provider stub', () => {
+describe('hms provider (real implementation)', () => {
+  // Real 100ms room ids are 24 lowercase hex chars - 'abc123' never matches.
+  const VALID_ROOM_ID = 'a'.repeat(24);
+  const ORIGINAL_ENV = { ...process.env };
+
+  beforeEach(() => {
+    delete process.env.HMS_ACCESS_KEY;
+    delete process.env.HMS_APP_SECRET;
+    delete process.env.HMS_WEBHOOK_SECRET;
+  });
+
+  afterEach(() => {
+    process.env = { ...ORIGINAL_ENV };
+  });
+
   it('carries the hms literal id', () => {
     expect(hmsProvider.provider).toBe('hms');
   });
 
-  it('rejects every room id until the real validator lands', () => {
+  it('isValidRoomId only accepts 24-char lowercase hex ids', () => {
     expect(hmsProvider.isValidRoomId('abc123')).toBe(false);
+    expect(hmsProvider.isValidRoomId(VALID_ROOM_ID)).toBe(true);
   });
 
-  it('createRoom and endRoom report 501 not-implemented', async () => {
+  it('createRoom reports 503 when HMS_ACCESS_KEY/HMS_APP_SECRET are not configured', async () => {
     const created = await hmsProvider.createRoom({ title: 'Test room' });
-    expect(created).toMatchObject({ ok: false, status: 501 });
+    expect(created).toMatchObject({ ok: false, status: 503 });
+  });
+
+  it('endRoom rejects an invalid room id with 400 before ever checking config', async () => {
     const ended = await hmsProvider.endRoom('abc123');
-    expect(ended).toMatchObject({ ok: false, status: 501 });
+    expect(ended).toMatchObject({ ok: false, status: 400 });
   });
 
-  it('getEmbed throws not-implemented', async () => {
-    await expect(hmsProvider.getEmbed('abc123')).rejects.toThrow(/not implemented/);
+  it('endRoom reports 503 for a valid-format room id when not configured', async () => {
+    const ended = await hmsProvider.endRoom(VALID_ROOM_ID);
+    expect(ended).toMatchObject({ ok: false, status: 503 });
   });
 
-  it('handleWebhook refuses deliveries with a 501', async () => {
+  it('getEmbed throws for an invalid room id', async () => {
+    await expect(hmsProvider.getEmbed('abc123')).rejects.toThrow(/Invalid HMS room id/);
+  });
+
+  it('handleWebhook returns 500 when HMS_WEBHOOK_SECRET is not configured', async () => {
     const res = await hmsProvider.handleWebhook(
       new Request('http://localhost/api/live/webhooks/hms', { method: 'POST', body: '{}' }),
     );
-    expect(res.status).toBe(501);
-    const body = (await res.json()) as { ok: boolean };
-    expect(body.ok).toBe(false);
+    expect(res.status).toBe(500);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toMatch(/HMS_WEBHOOK_SECRET/);
+  });
+
+  it('handleWebhook returns 401 for an unauthenticated delivery once a secret is configured', async () => {
+    process.env.HMS_WEBHOOK_SECRET = 'test-webhook-secret';
+    const res = await hmsProvider.handleWebhook(
+      new Request('http://localhost/api/live/webhooks/hms', { method: 'POST', body: '{}' }),
+    );
+    expect(res.status).toBe(401);
   });
 });

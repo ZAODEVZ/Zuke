@@ -27,6 +27,7 @@
  */
 import { createHmac } from 'crypto';
 import { NextResponse } from 'next/server';
+import { constantTimeEqual } from '@/lib/auth/constantTimeEqual';
 import type {
   CreateRoomInput,
   CreateRoomResult,
@@ -205,7 +206,7 @@ export const hmsProvider: LiveAudioProvider = {
 
     // 100ms webhooks send Authorization: <secret> or Bearer <secret>.
     const auth = req.headers.get('authorization') ?? '';
-    const matches = auth === secret || auth === `Bearer ${secret}`;
+    const matches = constantTimeEqual(auth, secret) || constantTimeEqual(auth, `Bearer ${secret}`);
     if (!matches) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
