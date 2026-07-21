@@ -133,6 +133,41 @@ export async function insertImportedSpace(input: ImportedSpaceInsert): Promise<v
   }
 }
 
+/** A Farcaster-native room Zuke observed via webhook but never created itself. */
+export interface NativeSpaceInsert {
+  id: string;
+  title: string;
+  createdByFid: number;
+  status: JukeSpaceStatus;
+  startedAt?: string | null;
+  raw?: unknown;
+}
+
+/**
+ * Backfill a row the first time Zuke sees ANY webhook event for a
+ * Farcaster-native room (hosted directly via Farcaster/Warpcast, not through
+ * Zuke's own `POST /v1/developer/spaces` call). Native rooms still fire
+ * `room.started`/`room.finished`, but {@link updateJukeSpace} is UPDATE-only
+ * and silently no-ops (0 rows matched, no error) when Zuke never wrote a row
+ * for that space_id - which is every native room by definition. Idempotent
+ * (upsert on id) so a second in-flight event for the same room updates
+ * rather than errors.
+ */
+export async function insertNativeJukeSpace(input: NativeSpaceInsert): Promise<void> {
+  const { error } = await sb.from('juke_spaces').upsert(
+    {
+      id: input.id,
+      title: input.title,
+      status: input.status,
+      created_by_fid: input.createdByFid,
+      started_at: input.startedAt ?? null,
+      raw: input.raw ?? null,
+    },
+    { onConflict: 'id' },
+  );
+  if (error) throw new Error(`insertNativeJukeSpace failed: ${error.message}`);
+}
+
 /** Fetch multiple space rows by id in a single query. Any unknown ids are
  * silently omitted. Used by the recordings shelf to hydrate space metadata
  * for spaces that have audio in juke_recordings but no recording_url set. */
