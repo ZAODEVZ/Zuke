@@ -11,7 +11,25 @@ vi.mock('@/lib/db/supabase', () => ({
 
 import { issueNonce, consumeNonce } from './nonce';
 
-describe('issueNonce / consumeNonce', () => {
+describe('issueNonce', () => {
+  it('returns an 80-char lowercase hex string', () => {
+    const nonce = issueNonce();
+    expect(nonce).toMatch(/^[0-9a-f]{80}$/);
+  });
+
+  it('is entirely alphanumeric (SIWE/EIP-4361 requirement - no dots or separators)', () => {
+    const nonce = issueNonce();
+    expect(/^[a-zA-Z0-9]+$/.test(nonce)).toBe(true);
+  });
+
+  it('returns a different nonce each time', () => {
+    const a = issueNonce();
+    const b = issueNonce();
+    expect(a).not.toBe(b);
+  });
+});
+
+describe('consumeNonce', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -32,10 +50,16 @@ describe('issueNonce / consumeNonce', () => {
     expect(mockInsert).not.toHaveBeenCalled();
   });
 
+  it('rejects a nonce with dots (the old, pre-fix format)', async () => {
+    const result = await consumeNonce('aabbccdd.1234567890123.deadbeefdeadbeefdeadbeefdeadbeef');
+    expect(result).toEqual({ ok: false, reason: 'malformed' });
+    expect(mockInsert).not.toHaveBeenCalled();
+  });
+
   it('rejects a nonce with a tampered signature', async () => {
+    mockInsert.mockResolvedValue({ error: null });
     const nonce = issueNonce();
-    const [random, ts] = nonce.split('.');
-    const tampered = `${random}.${ts}.${'0'.repeat(32)}`;
+    const tampered = nonce.slice(0, -8) + '00000000';
     const result = await consumeNonce(tampered);
     expect(result).toEqual({ ok: false, reason: 'bad-signature' });
     expect(mockInsert).not.toHaveBeenCalled();

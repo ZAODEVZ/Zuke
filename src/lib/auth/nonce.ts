@@ -3,6 +3,12 @@ import { ENV } from '@/lib/env';
 import { logger } from '@/lib/logger';
 import { supabaseAdmin } from '@/lib/db/supabase';
 
+// SIWE spec (EIP-4361) requires nonces to be entirely alphanumeric. The old
+// format (`{32hex}.{13digits}.{32hex}`) had dots, which Warpcast rejects at
+// signing time - this was the root cause of the live "Sign in failed"
+// incident (PR #17). Encode as 80 lowercase hex chars instead: 16B random ||
+// 8B timestamp || 16B HMAC. No dots, no separators.
+
 const NONCE_TTL_MS = 15 * 60 * 1000;
 
 /**
@@ -25,20 +31,17 @@ function consumeInMemory(nonce: string): { ok: boolean; reason?: string } {
   return { ok: true };
 }
 
-function hmac(payload: string): string {
+function hmacBytes(payload: Buffer): Buffer {
   if (!ENV.SESSION_SECRET) throw new Error('SESSION_SECRET not configured');
-  return crypto
-    .createHmac('sha256', ENV.SESSION_SECRET)
-    .update(payload)
-    .digest('hex')
-    .slice(0, 32);
+  return crypto.createHmac('sha256', ENV.SESSION_SECRET).update(payload).digest().subarray(0, 16);
 }
 
 export function issueNonce(): string {
-  const random = crypto.randomBytes(16).toString('hex');
-  const ts = Date.now().toString();
-  const sig = hmac(`${random}.${ts}`);
-  return `${random}.${ts}.${sig}`;
+  const random = crypto.randomBytes(16);
+  const tsBuf = Buffer.alloc(8);
+  tsBuf.writeBigUInt64BE(BigInt(Date.now()));
+  const sig = hmacBytes(Buffer.concat([random, tsBuf]));
+  return Buffer.concat([random, tsBuf, sig]).toString('hex');
 }
 
 /**
@@ -52,16 +55,19 @@ export function issueNonce(): string {
  * exists and is safe.
  */
 export async function consumeNonce(nonce: string): Promise<{ ok: boolean; reason?: string }> {
-  const parts = nonce.split('.');
-  if (parts.length !== 3) return { ok: false, reason: 'malformed' };
-  const [random, ts, sig] = parts;
+  if (!/^[0-9a-f]{80}$/.test(nonce)) return { ok: false, reason: 'malformed' };
 
-  const expected = hmac(`${random}.${ts}`);
-  if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) {
+  const buf = Buffer.from(nonce, 'hex');
+  const random = buf.subarray(0, 16);
+  const tsBuf = buf.subarray(16, 24);
+  const sig = buf.subarray(24, 40);
+
+  const expectedSig = hmacBytes(Buffer.concat([random, tsBuf]));
+  if (!crypto.timingSafeEqual(sig, expectedSig)) {
     return { ok: false, reason: 'bad-signature' };
   }
 
-  const issued = parseInt(ts, 10);
+  const issued = Number(tsBuf.readBigUInt64BE());
   if (!Number.isFinite(issued) || Date.now() - issued > NONCE_TTL_MS) {
     return { ok: false, reason: 'expired' };
   }
