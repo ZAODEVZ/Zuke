@@ -16,16 +16,20 @@
  * `juke_webhook_events.body`.
  */
 import { autoCastToZao } from '@/lib/publish/auto-cast';
+import { ENV } from '@/lib/env';
 import { logger } from '@/lib/logger';
 import { getBaseUrl } from '@/zuke.config';
 import { isAutoAgentJoinEnabled, joinAgentInJukeRoom } from './jukeAgentJoin';
+import { getJukeRoomDetail } from './juke-api-reads';
 import {
   addParticipant,
   bumpParticipantCount,
   getJukeSpace,
+  insertNativeJukeSpace,
   removeParticipant,
   updateJukeSpace,
   type JukeParticipantEntry,
+  type JukeSpaceStatus,
 } from './jukeSpacesDb';
 import { countRecordingsForSpace, insertRecording } from './recordingsDb';
 import { readRecordingParts } from './recordingParts';
@@ -145,6 +149,79 @@ function readParticipant(body: unknown, occurredAt: string): JukeParticipantEntr
   return { fid, display_name, role, joined_at: occurredAt };
 }
 
+/** Extra fields Juke's docs say only native-room webhook payloads carry:
+ * https://juke.audio/SKILL.md - "Webhooks for native rooms: room.started and
+ * room.finished fire with extra fields is_farcaster_native, farcaster_room_id,
+ * host_mode, farcaster_host_fid." participant.joined/left and recording.ready
+ * do NOT fire for native rooms at all - see the recording poll in
+ * room.finished below for the workaround. */
+interface NativeRoomMeta {
+  isNative: boolean;
+  hostMode: string | null;
+  hostFid: number | null;
+  farcasterRoomId: string | null;
+}
+
+function readNativeRoomMeta(body: unknown): NativeRoomMeta {
+  const b = (body ?? {}) as { data?: Record<string, unknown> };
+  const d = (b.data ?? {}) as {
+    is_farcaster_native?: unknown;
+    host_mode?: unknown;
+    farcaster_host_fid?: unknown;
+    farcaster_room_id?: unknown;
+  };
+  const hostFidRaw = d.farcaster_host_fid;
+  const hostFid =
+    typeof hostFidRaw === 'number' ? hostFidRaw : typeof hostFidRaw === 'string' ? Number(hostFidRaw) : null;
+  return {
+    isNative: d.is_farcaster_native === true,
+    hostMode: typeof d.host_mode === 'string' ? d.host_mode : null,
+    hostFid: hostFid !== null && Number.isFinite(hostFid) ? hostFid : null,
+    farcasterRoomId: typeof d.farcaster_room_id === 'string' ? d.farcaster_room_id : null,
+  };
+}
+
+/**
+ * Backfill a juke_spaces row the first time Zuke sees ANY event for a
+ * Farcaster-native room (one Zuke did not create via its own
+ * POST /v1/developer/spaces call - e.g. a space hosted directly in Warpcast).
+ * Without this, updateJukeSpace() below silently no-ops on every native-room
+ * event forever, since there is no row for it to update. No-ops if a row
+ * already exists, or if the event isn't tagged native at all.
+ */
+async function ensureNativeJukeSpaceExists(
+  spaceId: string,
+  meta: NativeRoomMeta,
+  status: JukeSpaceStatus,
+  occurredAt: string,
+): Promise<void> {
+  if (!meta.isNative) return;
+  const existing = await getJukeSpace(spaceId);
+  if (existing) return;
+
+  let title = 'Farcaster live space';
+  try {
+    const detail = await getJukeRoomDetail(spaceId, ENV.JUKE_API_KEY);
+    if (detail.ok && detail.data?.title) title = detail.data.title;
+  } catch (err: unknown) {
+    logger.warn('[juke/webhooks] getJukeRoomDetail failed while backfilling native space (non-fatal):', err);
+  }
+
+  await insertNativeJukeSpace({
+    id: spaceId,
+    title,
+    createdByFid: meta.hostFid ?? 0,
+    status,
+    startedAt: status === 'active' ? occurredAt : null,
+    raw: {
+      is_farcaster_native: true,
+      host_mode: meta.hostMode,
+      farcaster_room_id: meta.farcasterRoomId,
+      farcaster_host_fid: meta.hostFid,
+    },
+  });
+}
+
 /**
  * Apply the side effects for one verified, deduplicated webhook event.
  *
@@ -163,7 +240,9 @@ export async function applyWebhookEvent(
   }
   switch (eventType) {
     case 'room.started': {
-      await updateJukeSpace(spaceId, { status: 'active', started_at: readOccurredAt(body) });
+      const startedAt = readOccurredAt(body);
+      await ensureNativeJukeSpaceExists(spaceId, readNativeRoomMeta(body), 'active', startedAt);
+      await updateJukeSpace(spaceId, { status: 'active', started_at: startedAt });
       // Optional: drop ZOE into the room as a partner-scoped agent. Gated
       // by ZAO_AUTO_AGENT_JOIN=true env var since agents are data-publish
       // only in Juke v1 (no audio yet) and we don't have a VPS consumer
@@ -199,10 +278,44 @@ export async function applyWebhookEvent(
       // `juke_webhook_events`.
       const endedVia = readEndedVia(body);
       const occurredAt = readOccurredAt(body);
+      const nativeMeta = readNativeRoomMeta(body);
       if (endedVia) {
         logger.info('[juke/webhooks] room.finished ended_via=' + endedVia, { spaceId });
       }
+      await ensureNativeJukeSpaceExists(spaceId, nativeMeta, 'ended', occurredAt);
       await updateJukeSpace(spaceId, { status: 'ended', ended_at: occurredAt });
+
+      // Native rooms never fire recording.ready (Juke's docs are explicit
+      // about this) - poll once for a recording instead. This only catches a
+      // recording that's already ready by the time room.finished arrives; a
+      // recording Juke is still processing needs a later recheck (not built
+      // yet - a natural extension of the juke-stale-rooms cron).
+      if (nativeMeta.isNative) {
+        try {
+          const detail = await getJukeRoomDetail(spaceId, ENV.JUKE_API_KEY);
+          if (detail.ok && detail.data?.recording_url) {
+            const nextIndex = await countRecordingsForSpace(spaceId).catch(() => 0);
+            if (nextIndex === 0) {
+              await updateJukeSpace(spaceId, { recording_url: detail.data.recording_url });
+            }
+            await insertRecording({
+              spaceId,
+              url: detail.data.recording_url,
+              source: 'juke',
+              provider: 'juke',
+              partIndex: nextIndex,
+              title: null,
+              durationSeconds: null,
+            });
+          } else {
+            logger.info('[juke/webhooks] native room finished, no recording yet - needs a later recheck', {
+              spaceId,
+            });
+          }
+        } catch (err: unknown) {
+          logger.warn('[juke/webhooks] native-room recording poll failed (non-fatal):', err);
+        }
+      }
 
       // Recap cast: fire only for real session ends (host or api). Idle
       // empty-room timeouts (endedVia=null) had nobody to recap to so we

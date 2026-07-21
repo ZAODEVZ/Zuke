@@ -6,6 +6,7 @@ vi.mock('./jukeSpacesDb', () => ({
   bumpParticipantCount: vi.fn(),
   addParticipant: vi.fn(),
   removeParticipant: vi.fn(),
+  insertNativeJukeSpace: vi.fn(),
   getJukeSpace: vi.fn().mockResolvedValue({ title: 'Test Space', participants: [] }),
 }));
 vi.mock('./recordingsDb', () => ({
@@ -16,6 +17,12 @@ vi.mock('./jukeAgentJoin', () => ({
   isAutoAgentJoinEnabled: vi.fn().mockReturnValue(false),
   joinAgentInJukeRoom: vi.fn(),
 }));
+vi.mock('./juke-api-reads', () => ({
+  getJukeRoomDetail: vi.fn().mockResolvedValue({ ok: true, status: 200, data: {}, rateLimit: {} }),
+}));
+vi.mock('@/lib/env', () => ({
+  ENV: { JUKE_API_KEY: 'test-juke-key' },
+}));
 vi.mock('@/lib/publish/auto-cast', () => ({
   autoCastToZao: vi.fn().mockResolvedValue(null),
 }));
@@ -23,8 +30,16 @@ vi.mock('@/zuke.config', () => ({
   getBaseUrl: vi.fn().mockReturnValue('https://zuke.thezao.com'),
 }));
 
-import { updateJukeSpace, bumpParticipantCount, addParticipant, removeParticipant } from './jukeSpacesDb';
+import {
+  updateJukeSpace,
+  bumpParticipantCount,
+  addParticipant,
+  removeParticipant,
+  insertNativeJukeSpace,
+  getJukeSpace,
+} from './jukeSpacesDb';
 import { countRecordingsForSpace, insertRecording } from './recordingsDb';
+import { getJukeRoomDetail } from './juke-api-reads';
 import { autoCastToZao } from '@/lib/publish/auto-cast';
 
 describe('parseWebhookEvent', () => {
@@ -161,5 +176,88 @@ describe('applyWebhookEvent', () => {
     expect(insertRecording).toHaveBeenCalledWith(
       expect.objectContaining({ url: 'https://cdn/part-3.mp3', partIndex: 2 }),
     );
+  });
+});
+
+describe('native rooms (Farcaster-hosted, not created via Zuke)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(getJukeRoomDetail).mockResolvedValue({ ok: true, status: 200, data: {}, rateLimit: {} } as never);
+  });
+
+  it('room.started backfills a row when the native room has no existing space', async () => {
+    vi.mocked(getJukeSpace).mockResolvedValueOnce(null as never);
+    vi.mocked(getJukeRoomDetail).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      data: { id: 'sp-native-1', status: 'active', title: 'Real Farcaster Title' },
+      rateLimit: { limit: null, remaining: null, resetAtSeconds: null },
+    });
+    await applyWebhookEvent('room.started', 'sp-native-1', {
+      occurred_at: '2026-01-01T00:00:00Z',
+      data: { is_farcaster_native: true, host_mode: 'roving', farcaster_host_fid: 777, farcaster_room_id: 'fc-1' },
+    });
+    expect(insertNativeJukeSpace).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'sp-native-1',
+        title: 'Real Farcaster Title',
+        createdByFid: 777,
+        status: 'active',
+        startedAt: '2026-01-01T00:00:00Z',
+        raw: expect.objectContaining({ is_farcaster_native: true, host_mode: 'roving' }),
+      }),
+    );
+    expect(updateJukeSpace).toHaveBeenCalledWith('sp-native-1', {
+      status: 'active',
+      started_at: '2026-01-01T00:00:00Z',
+    });
+  });
+
+  it('room.started does not backfill when a row already exists for the native room', async () => {
+    // default getJukeSpace mock resolves truthy - row already exists
+    await applyWebhookEvent('room.started', 'sp-native-1', {
+      data: { is_farcaster_native: true, farcaster_host_fid: 777 },
+    });
+    expect(insertNativeJukeSpace).not.toHaveBeenCalled();
+  });
+
+  it('room.started does not even check for an existing space on a non-native event', async () => {
+    await applyWebhookEvent('room.started', 'sp-1', {});
+    expect(getJukeSpace).not.toHaveBeenCalled();
+    expect(insertNativeJukeSpace).not.toHaveBeenCalled();
+  });
+
+  it('room.finished polls for a recording on a native room and inserts it when ready', async () => {
+    vi.mocked(getJukeRoomDetail).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      data: { id: 'sp-native-1', status: 'ended', recording_url: 'https://cdn/native-recap.mp3' },
+      rateLimit: { limit: null, remaining: null, resetAtSeconds: null },
+    });
+    await applyWebhookEvent('room.finished', 'sp-native-1', {
+      data: { is_farcaster_native: true },
+    });
+    expect(insertRecording).toHaveBeenCalledWith(
+      expect.objectContaining({ spaceId: 'sp-native-1', url: 'https://cdn/native-recap.mp3', source: 'juke' }),
+    );
+    expect(updateJukeSpace).toHaveBeenCalledWith('sp-native-1', { recording_url: 'https://cdn/native-recap.mp3' });
+  });
+
+  it('room.finished does not insert a recording when the native room has none ready yet', async () => {
+    vi.mocked(getJukeRoomDetail).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      data: { id: 'sp-native-1', status: 'ended' },
+      rateLimit: { limit: null, remaining: null, resetAtSeconds: null },
+    });
+    await applyWebhookEvent('room.finished', 'sp-native-1', {
+      data: { is_farcaster_native: true },
+    });
+    expect(insertRecording).not.toHaveBeenCalled();
+  });
+
+  it('room.finished never polls Juke at all for a non-native room', async () => {
+    await applyWebhookEvent('room.finished', 'sp-1', {});
+    expect(getJukeRoomDetail).not.toHaveBeenCalled();
   });
 });
