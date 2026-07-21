@@ -110,7 +110,6 @@ describe('createJukeSpace', () => {
       scheduled_at: '2026-06-01T18:00:00.000Z',
       announce_cast: true,
       allow_agents: true,
-      record: false,
     });
   });
 
@@ -125,8 +124,16 @@ describe('createJukeSpace', () => {
       scheduled_at: null,
       announce_cast: false,
       allow_agents: false,
-      record: false,
     });
+  });
+
+  it('never sends a record field, even when the caller passes record: true - Juke 422s on it', async () => {
+    mockFetchOnce({ ok: true, status: 201, json: () => ({ id: 'abc123' }) });
+
+    await createJukeSpace({ title: 'Recorded Room', record: true }, CREDS);
+
+    const [, options] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(JSON.parse(options.body)).not.toHaveProperty('record');
   });
 
   it('returns the space with an embed URL on success', async () => {

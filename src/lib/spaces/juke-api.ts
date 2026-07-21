@@ -47,14 +47,19 @@ export interface CreateJukeSpaceInput {
   /** When true, AI agents are permitted to join the room. */
   allowAgents?: boolean;
   /**
-   * When true, Juke records the room. The recording.ready webhook fires when
-   * the file lands and `recording_url` populates on the juke_spaces row, which
-   * also drives the auto "Recording up" cast + /live/recordings shelf.
-   * Defaults to false (both on Juke's side and this function's own `?? false`
-   * fallback) when the caller omits it. The real `/live/create` form never
-   * sends this field, so spaces created through it are unrecorded by default;
-   * only the admin test console (`AdminConsole.tsx`) defaults its own local
-   * state to `true`. Same category of gap as `allowAgents` below.
+   * NOT SENT to Juke's create-space body anymore - kept on this type only so
+   * the field doesn't disappear from the wider CreateRoomInput/route contract
+   * (a bigger, separate change). Juke's API used to accept `record` at create
+   * time; as of 2026-07 it now 422s with "extra_forbidden" on ANY unrecognised
+   * body field, which was silently breaking every single space creation
+   * (found while verifying create-space works end to end in prod). Juke's
+   * current docs (juke.audio/SKILL.md, "Can users record the space?") say
+   * recording is now a host-side toggle via a separate
+   * `POST /v1/rooms/{spaceId}/recording/start|stop` call after the room
+   * exists - NOT wired up here, since that endpoint's auth model isn't
+   * documented with a code example the way create-space is, and guessing at
+   * it risks shipping another broken integration silently. Passing `record`
+   * here is a harmless no-op until that follow-up lands.
    */
   record?: boolean;
   /** Optional space description shown inside the Juke embed. */
@@ -136,13 +141,15 @@ export async function createJukeSpace(
   credentials: JukeCredentials,
 ): Promise<CreateJukeSpaceResult> {
   // Translate the camelCase ZAO shape into Juke's documented snake_case body.
+  // `record` is deliberately NOT included - see CreateJukeSpaceInput's
+  // `record` field doc for why (Juke's schema now 422s on any unrecognised
+  // field, which was breaking every single create-space call).
   const body = JSON.stringify({
     title: input.title,
     description: input.description ?? undefined,
     scheduled_at: input.scheduledAt ?? null,
     announce_cast: input.announceCast ?? false,
     allow_agents: input.allowAgents ?? false,
-    record: input.record ?? false,
   });
 
   let response: Response;
