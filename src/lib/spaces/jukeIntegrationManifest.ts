@@ -287,6 +287,14 @@ const SHIPPED: ShippedFeature[] = [
 
 const OPEN_ASKS: OpenAsk[] = [
   {
+    id: 'embed-siwf-sign-in-failing',
+    title: 'Hosted embed "Sign in to participate" fails instantly on approve',
+    reason:
+      "Confirmed live 2026-07-21: tapping Sign in to participate inside the hosted iframe (juke.audio/embed/{id}) shows the correct Warpcast consent screen (app name, requested scope all correct), but the instant the user taps Sign in inside Warpcast, it fails immediately with a bare \"Sign in failed\" and zero further detail - repeatable every time, on an up-to-date Warpcast app. Ruled out account/device: the SAME Farcaster account completes SIWF successfully on an unrelated third-party app moments later, so this is isolated to the embed's own sign-in implementation, not the user's client. We independently hit and fixed the identical symptom in our own separate SIWF integration (Zuke's own admin login, unrelated to this embed) - two root causes there: (1) a nonce format with non-alphanumeric separators, which SIWE/EIP-4361 requires to be entirely alphanumeric - Warpcast validates this at signing time and rejects a non-conforming nonce with exactly this silent instant-fail; (2) a domain/uri field mismatch in the SIWE message construction. Per your own SDK docs (juke.audio/SKILL.md, 'How the trust boundary works'), the SDK builds its SIWE message using domain = window.location.hostname - worth checking whether the nonce format issued by POST /v1/auth/siwf/nonce is guaranteed entirely alphanumeric, and whether domain/uri construction is consistent, since those are the two things that fixed the identical symptom on our side.",
+    blocks: 'Any listener promoting to speaker/reacting inside the hosted embed - listening-only works fine',
+    priority: 'p0',
+  },
+  {
     id: 'agents',
     title: 'Agent join surface — when can ZOE sit in a Juke room, unattended?',
     reason:
