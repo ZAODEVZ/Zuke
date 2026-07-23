@@ -133,12 +133,12 @@ export default function HomePage() {
             Host or import a space, keep its recording (multi-part aware), cut the highlights into
             snippets, then hand the audio plus your Farcaster guest list to the open-source{' '}
             <a
-              href="https://github.com/99darwin/juke-space-recap"
+              href="https://github.com/bettercallzaal/mp3-to-mp4-pipeline"
               target="_blank"
               rel="noreferrer noopener"
               className="text-[#a78bfa] hover:underline"
             >
-              juke-space-recap
+              mp3-to-mp4-pipeline
             </a>{' '}
             Remotion pipeline for a 1080p recap with per-guest PFPs. Thanks{' '}
             <a
