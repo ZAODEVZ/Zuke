@@ -164,24 +164,33 @@ Tests use `vitest` with mocked Supabase/Juke clients. No production database is 
 ### Working
 
 - Juke integration (create rooms, webhook dispatch, recording capture)
-- SIWF + FID allowlist admin auth
+- Native Farcaster rooms (created directly via Warpcast, not Zuke's own
+  create-space call) - webhook backfill for the DB row plus a stale-rooms
+  cron recheck for recordings, since native rooms don't fire
+  `participant.joined/left` or `recording.ready` and must be polled instead
+- HMS/100ms provider - `createRoom`/`endRoom` call the real HMS API,
+  webhook handling (auth, dedup, timing-safe signature check) is real. Still
+  missing: `/live/hms/[id]` player component (`@100mslive/react-sdk`), a
+  recording start/stop toggle (100ms's auth model for that call isn't
+  documented yet), and a one-open-session-per-room guard
+- SIWF + FID allowlist admin auth (see known issue below)
 - X Space import (fetch + sync to DB)
 - Recording multi-part stitching + recap video generation
 - Snippet creation (audio segment extraction)
 
 ### In Progress / Debugging
 
+- **SIWF sign-in intermittently fails on Warpcast** ("Sign in failed") on
+  `/admin/login`. Two candidate fixes have landed - an explicit `siweUri`
+  (bare origin instead of auth-kit's default, which includes the `/admin/login`
+  path) and a nonce format rewrite to satisfy SIWE's alphanumeric-only spec -
+  but a real-phone retest confirming both fixes together resolve it end-to-end
+  is still outstanding. The Juke *embed's* own sign-in (separate from this
+  admin login) has its own distinct SIWF bug, filed with Juke's team directly.
 - Import-x error handling (recent work on line 92 of `/api/recordings/import-x/route.ts` shows DB errors to admins temporarily)
 - Webhook delivery reliability (recent fix for `recording.ready` events clobbering `recording_url`)
 
 ### Not Yet Implemented
-
-- **HMS/100ms backend** - Provider scaffold exists (`src/lib/spaces/providers/hms.ts`) but is all TODOs. Requires:
-  - 100ms SDK integration + auth token generation
-  - Webhook event dedup (idempotency table)
-  - One-open-session-per-room unique index
-  - Stale-room sweeper for reconciliation
-  - Full webhook verification + event routing
 
 - **Auto-casting** - Stub in `src/lib/publish/auto-cast.ts` (always no-ops). Needs:
   - ZAO signer credential provisioning (`APP_SIGNER_PRIVATE_KEY` env var)
@@ -258,6 +267,19 @@ Check `npm run typecheck` - may be missing env vars or type mismatches in `/src/
 - **Setup Guide:** See `setup-zuke.md` for complete provisioning steps
 - **Architecture Docs:** See `docs/recap.md` for recording/snippet/recap-video flow
 - **Juke Integration Docs:** See `src/app/juke-integration.md/route.ts` (OpenAPI-style docs)
+
+### Related repositories
+
+Zuke is serverless and deliberately renders nothing (see `docs/recap.md`) - a
+finished space's audio + resolved Farcaster identities get handed to one of
+two separate, offline render pipelines:
+
+- **[bettercallzaal/ZAOVideoEditor](https://github.com/bettercallzaal/ZAOVideoEditor)**
+  - a branded 1080p YouTube audiogram (waveform + captions + title/description/
+  chapters/tags) off a Zuke space id in one command.
+- **[bettercallzaal/mp3-to-mp4-pipeline](https://github.com/bettercallzaal/mp3-to-mp4-pipeline)**
+  - a Remotion recap video with a PFP card per guest, built from the same
+  recap-inputs JSON (`GET /api/recordings/recap?spaceId={id}`).
 
 ## License
 
