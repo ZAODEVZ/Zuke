@@ -53,7 +53,7 @@ the Farcaster identities of everyone who joined. Zuke itself renders nothing.
 | Want | Use | Cost |
 | --- | --- | --- |
 | A YouTube upload (1080p mp4 + captions + title/description/chapters/tags) | [`bettercallzaal/ZAOVideoEditor`](https://github.com/bettercallzaal/ZAOVideoEditor) | minutes |
-| A recap video with per-guest PFPs | [`99darwin/juke-space-recap`](https://github.com/99darwin/juke-space-recap) | 3–6 hours |
+| A recap video with per-guest PFPs | [`bettercallzaal/mp3-to-mp4-pipeline`](https://github.com/bettercallzaal/mp3-to-mp4-pipeline) | 3–6 hours |
 
 ### YouTube (ZAOVideoEditor)
 
@@ -72,7 +72,7 @@ natively. Nothing is uploaded automatically.
 
 ### Per-guest PFP recap (Remotion)
 
-[`99darwin/juke-space-recap`](https://github.com/99darwin/juke-space-recap) is a
+[`bettercallzaal/mp3-to-mp4-pipeline`](https://github.com/bettercallzaal/mp3-to-mp4-pipeline) is a
 Remotion pipeline that turns a long space recording into a 1920×1080 recap video
 with per-guest PFPs, rolling captions, and a waveform. It uses Deepgram
 transcription and a 3–6 hour Remotion render, and has a human-in-the-loop step
@@ -89,7 +89,7 @@ for matching spoken names to `@handles`.
   "audio": [{ "url": "...", "title": "Part 1", "source": "juke", "durationSeconds": 5400 }],
   "host": { "fid": 123, "username": "zaal", "display_name": "Zaal", "pfp_url": "https://…" },
   "participants": [{ "fid": 456, "username": "…", "display_name": "…", "pfp_url": "…", "role": "speaker" }],
-  "pipeline": { "repo": "https://github.com/99darwin/juke-space-recap", "note": "…" }
+  "pipeline": { "repo": "https://github.com/bettercallzaal/mp3-to-mp4-pipeline", "note": "…" }
 }
 ```
 
@@ -116,7 +116,7 @@ Outputs `<slug>.mp4`, `<slug>.srt`, and `<slug>.youtube.txt`. Upload is manual.
 ### Running the PFP recap render
 
 1. Download a recording (the `audio[]` URLs above).
-2. Clone `99darwin/juke-space-recap`, `npm install`, set `DEEPGRAM_API_KEY` /
+2. Clone `bettercallzaal/mp3-to-mp4-pipeline`, `npm install`, set `DEEPGRAM_API_KEY` /
    `NEYNAR_API_KEY` / `HOST_USERNAME`, drop the audio in `public/audio.ogg`.
 3. Run `transcribe → intros → pfps → waveform`, then `npm run render`. The
    Zuke recap-inputs JSON pre-fills the per-guest `@username` step for everyone

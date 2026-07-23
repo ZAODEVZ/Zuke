@@ -10,7 +10,7 @@ import { fetchProfilesByFids, type FarcasterProfile } from '@/lib/farcaster/neyn
 /**
  * GET /api/recordings/recap?spaceId={id} — the bridge to the OSS recap tool.
  *
- * The juke-space-recap Remotion pipeline (99darwin/juke-space-recap) renders a
+ * The mp3-to-mp4-pipeline Remotion pipeline (bettercallzaal/mp3-to-mp4-pipeline) renders a
  * 1920×1080 recap video from a space's audio + per-guest PFPs. That render is
  * OFFLINE (Deepgram transcription + a 3–6 hour Remotion render) and cannot run
  * in Zuke's serverless functions — so this endpoint hands the pipeline exactly
@@ -135,7 +135,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     host,
     participants,
     pipeline: {
-      repo: 'https://github.com/99darwin/juke-space-recap',
+      repo: 'https://github.com/bettercallzaal/mp3-to-mp4-pipeline',
       note: 'Offline render: download the audio, run the pipeline (transcribe → intros → pfps → render). These profiles pre-fill the per-guest username step for participants Zuke already tracked.',
     },
   };

@@ -52,7 +52,7 @@ export default function ImportXSpacePage() {
               From there it behaves like any Zuke recording — play it, cut snippets, and export the
               inputs for a{' '}
               <a
-                href="https://github.com/99darwin/juke-space-recap"
+                href="https://github.com/bettercallzaal/mp3-to-mp4-pipeline"
                 target="_blank"
                 rel="noreferrer noopener"
                 className="text-[#a78bfa] hover:underline"
